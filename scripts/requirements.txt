@@ -1,0 +1,5 @@
+# Requirements for database initialization script
+pymongo
+motor
+bcrypt
+dnspython
