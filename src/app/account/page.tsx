@@ -135,7 +135,7 @@ export default function AccountPage() {
     fetchUserData();
   }, [router]);
 
-  // Fetch customers when members tab is active
+  // Fetch customers when members tab is active or selected store changes
   useEffect(() => {
     const fetchCustomers = async () => {
       if (activeTab !== 'members' || userStores.length === 0) return;
@@ -145,24 +145,21 @@ export default function AccountPage() {
         const token = localStorage.getItem('access_token');
         if (!token) return;
 
-        let allCustomers: any[] = [];
+        const currentStore = userStores[selectedStoreIndex];
+        if (!currentStore) return;
 
-        // Fetch customers from all user's stores
-        for (const store of userStores) {
-          const response = await fetch(`http://127.0.0.1:8000/customers?store_id=${store._id}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (response.ok) {
-            const storeCustomers = await response.json();
-            allCustomers = [...allCustomers, ...storeCustomers];
+        // Fetch customers from the selected store only
+        const response = await fetch(`http://127.0.0.1:8000/customers?store_id=${currentStore._id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
-        }
+        });
 
-        setCustomers(allCustomers);
+        if (response.ok) {
+          const storeCustomers = await response.json();
+          setCustomers(storeCustomers);
+        }
       } catch (err) {
         console.error('Error fetching customers:', err);
       } finally {
@@ -171,7 +168,7 @@ export default function AccountPage() {
     };
 
     fetchCustomers();
-  }, [activeTab, userStores]);
+  }, [activeTab, userStores, selectedStoreIndex]);
 
   const handleCreateStore = async () => {
     try {

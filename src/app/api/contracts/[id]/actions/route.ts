@@ -4,11 +4,11 @@ import { ObjectId } from 'mongodb';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = await getDatabase();
-    const contractId = params.id;
+    const { id: contractId } = await params;
     const actionData = await request.json();
 
     if (!ObjectId.isValid(contractId)) {
@@ -37,43 +37,52 @@ export async function POST(
 
     // Handle different action types
     switch (actionData.type) {
-      case 'interest_payment':
-        // No status change for interest payment
-        break;
-
-      case 'principal_increase':
-        updateData['pawnDetails.pawnedPrice'] = contract.pawnDetails.pawnedPrice + actionData.amount;
-        updateData['pawnDetails.remainingAmount'] = contract.pawnDetails.remainingAmount + actionData.amount;
-        break;
-
-      case 'principal_decrease':
-        updateData['pawnDetails.pawnedPrice'] = Math.max(0, contract.pawnDetails.pawnedPrice - actionData.amount);
+      case 'pay_interest':
+        // Update remaining amount after interest payment
         updateData['pawnDetails.remainingAmount'] = Math.max(0, contract.pawnDetails.remainingAmount - actionData.amount);
+        transactionData.beforeBalance = contract.pawnDetails.remainingAmount;
+        transactionData.afterBalance = updateData['pawnDetails.remainingAmount'];
+        break;
+
+      case 'increase_loan':
+        updateData['pawnDetails.pawnedPrice'] = contract.pawnDetails.pawnedPrice + actionData.amount;
+        // Recalculate total interest with new principal
+        const newTotalInterest = updateData['pawnDetails.pawnedPrice'] *
+          (contract.pawnDetails.interestRate / 100) *
+          (contract.pawnDetails.periodDays / 30);
+        updateData['pawnDetails.totalInterest'] = newTotalInterest;
+        updateData['pawnDetails.remainingAmount'] = updateData['pawnDetails.pawnedPrice'] + newTotalInterest;
+        transactionData.beforeBalance = contract.pawnDetails.pawnedPrice;
+        transactionData.afterBalance = updateData['pawnDetails.pawnedPrice'];
+        break;
+
+      case 'decrease_loan':
+        updateData['pawnDetails.pawnedPrice'] = Math.max(0, contract.pawnDetails.pawnedPrice - actionData.amount);
+        // Recalculate total interest with new principal
+        const updatedTotalInterest = updateData['pawnDetails.pawnedPrice'] *
+          (contract.pawnDetails.interestRate / 100) *
+          (contract.pawnDetails.periodDays / 30);
+        updateData['pawnDetails.totalInterest'] = updatedTotalInterest;
+        updateData['pawnDetails.remainingAmount'] = updateData['pawnDetails.pawnedPrice'] + updatedTotalInterest;
+        transactionData.beforeBalance = contract.pawnDetails.pawnedPrice;
+        transactionData.afterBalance = updateData['pawnDetails.pawnedPrice'];
         break;
 
       case 'redeem':
         updateData.status = 'redeemed';
         updateData['dates.redeemDate'] = now;
+        updateData['pawnDetails.remainingAmount'] = 0;
+        transactionData.beforeBalance = contract.pawnDetails.remainingAmount;
+        transactionData.afterBalance = 0;
         break;
 
       case 'suspend':
         updateData.status = 'suspended';
         updateData['dates.suspendedDate'] = now;
-        break;
-
-      case 'extend':
-        const newDueDate = new Date(contract.dates.dueDate);
-        newDueDate.setDate(newDueDate.getDate() + (actionData.extensionDays || 30));
-        updateData['dates.dueDate'] = newDueDate;
-
-        // Calculate additional interest for extension
-        const extensionInterest = contract.pawnDetails.pawnedPrice *
-          (contract.pawnDetails.interestRate / 100) *
-          ((actionData.extensionDays || 30) / 30);
-
-        updateData['pawnDetails.totalInterest'] = contract.pawnDetails.totalInterest + extensionInterest;
-        updateData['pawnDetails.remainingAmount'] = contract.pawnDetails.remainingAmount + extensionInterest;
-        transactionData.amount = extensionInterest;
+        transactionData.beforeBalance = contract.pawnDetails.remainingAmount;
+        transactionData.afterBalance = contract.pawnDetails.remainingAmount;
+        transactionData.amount = 0;
+        transactionData.note = actionData.reason ? `${actionData.reason}: ${actionData.note || ''}` : actionData.note;
         break;
 
       default:
@@ -83,13 +92,16 @@ export async function POST(
     // Update contract
     await db.collection('contracts').updateOne(
       { _id: contractObjectId },
-      { $set: updateData }
+      {
+        $set: updateData,
+        $push: { transactionHistory: transactionData._id }
+      }
     );
 
     // Add transaction record
     await db.collection('transactions').insertOne(transactionData);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, transactionId: transactionData._id });
   } catch (error) {
     console.error('Contract action API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

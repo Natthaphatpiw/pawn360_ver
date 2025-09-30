@@ -4,11 +4,11 @@ import { ObjectId } from 'mongodb';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = await getDatabase();
-    const contractId = params.id;
+    const { id: contractId } = await params;
 
     if (!ObjectId.isValid(contractId)) {
       return NextResponse.json({ error: 'Invalid contract ID' }, { status: 400 });
@@ -38,13 +38,23 @@ export async function GET(
       return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
     }
 
-    // Get transaction history
-    const transactions = await db.collection('transactions')
-      .find({ contractId: new ObjectId(contractId) })
-      .sort({ createdAt: -1 })
-      .toArray();
-
     const contractData = contract[0];
+
+    // Get transaction history using IDs from contract
+    let transactions = [];
+    if (contractData.transactionHistory && contractData.transactionHistory.length > 0) {
+      transactions = await db.collection('transactions')
+        .find({ _id: { $in: contractData.transactionHistory.map((id: any) => new ObjectId(id)) } })
+        .sort({ createdAt: -1 })
+        .toArray();
+    } else {
+      // Fallback: get by contractId if transactionHistory is empty
+      transactions = await db.collection('transactions')
+        .find({ contractId: new ObjectId(contractId) })
+        .sort({ createdAt: -1 })
+        .toArray();
+    }
+
     contractData.transactionHistory = transactions;
 
     return NextResponse.json(contractData);
@@ -56,11 +66,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = await getDatabase();
-    const contractId = params.id;
+    const { id: contractId } = await params;
     const updateData = await request.json();
 
     if (!ObjectId.isValid(contractId)) {

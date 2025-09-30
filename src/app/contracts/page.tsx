@@ -81,6 +81,9 @@ export default function ContractsPage() {
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const [userStores, setUserStores] = useState<any[]>([]);
 
+  // Sorting state - default sort by date (newest first)
+  const [sortState, setSortState] = useState({ field: 'dueDate', order: 'default' });
+
   // Fetch user stores and contracts
   useEffect(() => {
     const fetchUserData = async () => {
@@ -356,6 +359,95 @@ export default function ContractsPage() {
     }).format(amount);
   };
 
+  // Sorting functions
+  const handleSort = (field: string) => {
+    let newOrder = 'asc';
+    if (sortState.field === field) {
+      if (sortState.order === 'asc') newOrder = 'desc';
+      else if (sortState.order === 'desc') newOrder = 'default';
+      else newOrder = 'asc';
+    }
+
+    setSortState({ field, order: newOrder });
+  };
+
+  const sortContracts = (contracts: Contract[]) => {
+    // Apply default sorting if no explicit sort is set
+    if (sortState.order === 'default' && sortState.field === 'dueDate') {
+      // Default: sort by dueDate descending (newest first)
+      return [...contracts].sort((a, b) => {
+        const aDate = new Date(a.dates.dueDate).getTime();
+        const bDate = new Date(b.dates.dueDate).getTime();
+        return bDate - aDate; // Descending order
+      });
+    }
+
+    if (sortState.order === 'default') return contracts;
+
+    return [...contracts].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortState.field) {
+        case 'contractNumber':
+          aValue = a.contractNumber;
+          bValue = b.contractNumber;
+          break;
+        case 'item':
+          aValue = a.item.model;
+          bValue = b.item.model;
+          break;
+        case 'value':
+          aValue = a.pawnDetails.pawnedPrice;
+          bValue = b.pawnDetails.pawnedPrice;
+          break;
+        case 'status':
+          aValue = a.status;
+          bValue = b.status;
+          break;
+        case 'dueDate':
+          aValue = new Date(a.dates.dueDate).getTime();
+          bValue = new Date(b.dates.dueDate).getTime();
+          break;
+        default:
+          return 0;
+      }
+
+      if (sortState.order === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+  };
+
+  // Sort button component
+  const SortButton = ({ field }: { field: string }) => {
+    const isActive = sortState.field === field;
+    const order = isActive ? sortState.order : 'default';
+
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleSort(field);
+        }}
+        className="ml-1 p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
+      >
+        {order === 'asc' ? (
+          <ChevronUp size={12} className="text-blue-500" />
+        ) : order === 'desc' ? (
+          <ChevronDown size={12} className="text-blue-500" />
+        ) : (
+          <div className="flex flex-col">
+            <ChevronUp size={8} className="text-gray-300 -mb-1" />
+            <ChevronDown size={8} className="text-gray-300" />
+          </div>
+        )}
+      </button>
+    );
+  };
+
   return (
     <FixedLayout>
       <div className={`flex h-full gap-1 ${sarabun.className}`}>
@@ -469,11 +561,36 @@ export default function ContractsPage() {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Contract No.</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Item</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Value</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Status</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Due Date</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center">
+                          Contract No.
+                          <SortButton field="contractNumber" />
+                        </div>
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center">
+                          Item
+                          <SortButton field="item" />
+                        </div>
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center">
+                          Value
+                          <SortButton field="value" />
+                        </div>
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center">
+                          Status
+                          <SortButton field="status" />
+                        </div>
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">
+                        <div className="flex items-center">
+                          Due Date
+                          <SortButton field="dueDate" />
+                        </div>
+                      </th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-gray-700"></th>
                     </tr>
                   </thead>
@@ -490,14 +607,14 @@ export default function ContractsPage() {
                           {error}
                         </td>
                       </tr>
-                    ) : filteredContracts.length === 0 ? (
+                    ) : sortContracts(filteredContracts).length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-8 text-center text-gray-500">
                           No contracts found
                         </td>
                       </tr>
                     ) : (
-                      filteredContracts.map((contract, index) => (
+                      sortContracts(filteredContracts).map((contract, index) => (
                         <tr
                           key={contract._id}
                           className={`border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
