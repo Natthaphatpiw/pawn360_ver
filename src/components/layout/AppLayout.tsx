@@ -4,7 +4,13 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import { Bell, Search, Menu, X } from 'lucide-react';
+import { Poppins } from 'next/font/google';
 
+
+const poppins = Poppins({
+  weight: '400',
+  subsets: ['latin'],
+})
 interface AppLayoutProps {
   children: React.ReactNode;
 }
@@ -83,10 +89,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Header */}
-        <header className="bg-[#F5F4F2] border-b border-l-grey-2 px-6 py-[1.1rem]">
+        <header className="bg-[#F5F4F2] border-b border-l-grey-2 px-0 py-[1.1rem]">
           <div className="flex items-center justify-between">
             {/* Left Side */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-0">
+            <div className="flex flex-col">
+              <div className="text-xs text-gray-400 ${poppins.className}">
+                Pages / {getPageTitle()}
+              </div>
+              <div className="text-[0.885rem] font-[500] ${poppins.className} text-d-grey-5 leading-[1.2rem] py-[0.185rem]">
+                {getPageTitle()}
+              </div>
+            </div>
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -104,7 +118,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </button>
 
               {/* User Name */}
-              <div className="text-sm font-medium text-d-grey-5">
+              <div className={`px-8 text-[0.785rem] font-[500] whitespace-nowrap overflow-hidden text-ellipsis ${poppins.className} text-d-grey-5`}>
                 Natthaphat
               </div>
             </div>
@@ -112,12 +126,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto">
-          <div className="p-6">
+        <main className="flex-1 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm h-full p-6">
             {children}
           </div>
         </main>
-      </div>
+        </div>
     </div>
   );
 }

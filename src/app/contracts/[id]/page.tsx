@@ -2,14 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import AppLayout from '@/components/layout/AppLayout';
-import { 
-  ArrowLeft, 
-  User, 
-  Package, 
-  DollarSign, 
-  Calendar, 
-  Phone, 
+import FixedLayout from '@/components/layout/FixedLayout';
+import { contractsData, Contract, updateContract } from '@/data/contracts';
+import { Sarabun } from 'next/font/google';
+const sarabun = Sarabun({
+  subsets: ['latin','thai'],
+  weight: ['400', '500', '600', '700'],
+});
+import {
+  ArrowLeft,
+  User,
+  Package,
+  DollarSign,
+  Calendar,
+  Phone,
   MapPin,
   CreditCard,
   Clock,
@@ -26,81 +32,6 @@ import {
   X
 } from 'lucide-react';
 
-interface Contract {
-  id: string;
-  contractNumber: string;
-  customer: {
-    name: string;
-    phone: string;
-    idNumber: string;
-    address: string;
-  };
-  item: {
-    brand: string;
-    model: string;
-    type: string;
-    serialNo: string;
-    accessories: string;
-    condition: number;
-    defects: string;
-    note: string;
-    images: string[];
-  };
-  pawnDetails: {
-    aiEstimatedPrice: number;
-    pawnedPrice: number;
-    interestRate: number;
-    periodDays: number;
-  };
-  dates: {
-    startDate: string;
-    dueDate: string;
-  };
-  status: 'active' | 'overdue' | 'redeemed' | 'suspended' | 'sold';
-  transactionHistory: {
-    id: string;
-    type: 'interest_payment' | 'principal_increase' | 'principal_decrease' | 'redeem' | 'suspend';
-    amount: number;
-    paymentMethod?: string;
-    date: string;
-    note?: string;
-  }[];
-}
-
-// Mock contract data matching screenshot
-const mockContract: Contract = {
-  id: '2',
-  contractNumber: '6UIT5SZ3H0CJ',
-  customer: {
-    name: 'Alex Wilson',
-    phone: '0822222222',
-    idNumber: '8888888888888',
-    address: '130/26, , ปลองีบน536, ดิทยุ, คลองกีู, กรุงเทพ, ไทย, 11100'
-  },
-  item: {
-    brand: 'Lenovo',
-    model: 'IdeaPad Slim 7',
-    type: 'Laptop',
-    serialNo: '43154316',
-    accessories: 'Standard accessories',
-    condition: 85,
-    defects: 'None',
-    note: 'Demo contract',
-    images: []
-  },
-  pawnDetails: {
-    aiEstimatedPrice: 14000,
-    pawnedPrice: 14000,
-    interestRate: 3.0,
-    periodDays: 7
-  },
-  dates: {
-    startDate: '2025-08-31',
-    dueDate: '2025-09-07'
-  },
-  status: 'overdue',
-  transactionHistory: []
-};
 
 interface ModalProps {
   isOpen: boolean;
@@ -140,25 +71,34 @@ export default function ContractDetailPage() {
   const [modalData, setModalData] = useState<any>({});
 
   useEffect(() => {
-    // In a real app, fetch contract data based on params.id
-    setContract(mockContract);
+    // Find contract by ID from the shared contracts data
+    const contractId = Array.isArray(params.id) ? params.id[0] : params.id;
+    const foundContract = contractsData.find(contract => String(contract.id) === String(contractId));
+    setContract(foundContract || null);
   }, [params.id]);
+
+  const TitleBadge = ({ text }: { text: string }) => (
+    <div className={`bg-[#CAC8C8] text-gray-600 text-[12px] font-normal px-2 py-0.5 rounded-md ${sarabun.className}`}>
+      {text}
+    </div>
+  );
 
   if (!contract) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-leaf-green"></div>
+      <FixedLayout>
+        <div className={`flex items-center justify-center h-64 ${sarabun.className}`}>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#487C47] mx-auto mb-4"></div>
+            <p className="text-gray-500">Contract not found or loading...</p>
+          </div>
         </div>
-      </AppLayout>
+      </FixedLayout>
     );
   }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('th-TH', {
-      style: 'currency',
-      currency: 'THB',
-      minimumFractionDigits: 0,
+      minimumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -183,8 +123,8 @@ export default function ContractDetailPage() {
     const Icon = config.icon;
 
     return (
-      <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
-        <Icon size={16} />
+      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded text-xs font-medium ${config.bg} ${config.text}`}>
+        <Icon size={14} />
         {config.label}
       </span>
     );
@@ -207,8 +147,56 @@ export default function ContractDetailPage() {
   };
 
   const handleModalSubmit = () => {
-    // Handle the action based on activeModal type
-    console.log('Action:', activeModal, 'Data:', modalData);
+    if (!contract) return;
+
+    console.log('=== BEFORE TRANSACTION ===');
+    console.log('Current transactions count:', contract.transactionHistory.length);
+    console.log('Modal data:', modalData);
+    console.log('Active modal:', activeModal);
+
+    // Create new transaction record
+    const newTransaction = {
+      id: Date.now().toString(),
+      type: activeModal as 'interest_payment' | 'principal_increase' | 'principal_decrease' | 'redeem' | 'suspend',
+      amount: modalData.amount ? parseInt(modalData.amount) : (activeModal === 'redeem' ? calculateTotal() : calculateInterest()),
+      paymentMethod: modalData.paymentMethod,
+      date: new Date().toISOString().split('T')[0],
+      note: modalData.note
+    };
+
+    console.log('New transaction:', newTransaction);
+
+    // Update contract with new transaction and status
+    const updatedContract = {
+      ...contract,
+      transactionHistory: [...contract.transactionHistory, newTransaction]
+    };
+
+    // Update status based on action
+    if (activeModal === 'redeem') {
+      updatedContract.status = 'redeemed' as const;
+    } else if (activeModal === 'suspend') {
+      updatedContract.status = 'suspended' as const;
+    }
+
+    // Update principal amount for increase/decrease actions
+    if (activeModal === 'increase_loan' && modalData.amount) {
+      updatedContract.pawnDetails.pawnedPrice += parseInt(modalData.amount);
+    } else if (activeModal === 'decrease_loan' && modalData.amount) {
+      updatedContract.pawnDetails.pawnedPrice = Math.max(0, updatedContract.pawnDetails.pawnedPrice - parseInt(modalData.amount));
+    }
+
+    // Update the local state
+    setContract(updatedContract);
+
+    // Update the shared contracts data
+    updateContract(contract.id, updatedContract);
+
+    console.log('=== AFTER TRANSACTION ===');
+    console.log('Updated transactions count:', updatedContract.transactionHistory.length);
+    console.log('Updated contract status:', updatedContract.status);
+    console.log('Updated principal:', updatedContract.pawnDetails.pawnedPrice);
+
     setActiveModal(null);
     setModalData({});
   };
@@ -493,114 +481,127 @@ export default function ContractDetailPage() {
   };
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 text-clay-grey hover:text-leaf-green hover:bg-l-grey-1 rounded-lg transition-colors"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-d-grey-5">Contract Details</h1>
-              <p className="text-clay-grey font-mono">{contract.contractNumber}</p>
+    <FixedLayout>
+      <div className={`flex h-full gap-1 ${sarabun.className}`}>
+        {/* Left Panel - Scrollable */}
+        <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+          {/* Header */}
+          <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => router.back()}
+                  className="p-2 text-gray-600 hover:text-[#487C47] hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div className="flex items-center gap-1">
+                  <h1 className="text-xl font-semibold">Contract Details</h1>
+                  <TitleBadge text="รายละเอียดสัญญา" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {getStatusBadge(contract.status)}
+                <button className="p-2 text-gray-600 hover:text-[#487C47] hover:bg-gray-100 rounded-lg transition-colors">
+                  <Download size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="mt-2">
+              <p className="text-gray-500 font-mono text-sm">{contract.contractNumber}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {getStatusBadge(contract.status)}
-            <button className="p-2 text-clay-grey hover:text-leaf-green hover:bg-l-grey-1 rounded-lg transition-colors">
-              <Download size={20} />
-            </button>
-          </div>
-        </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Customer Information */}
-            <div className="bg-white rounded-xl shadow-sm border border-l-grey-2 p-6">
-              <h2 className="text-lg font-semibold text-d-grey-5 mb-4 flex items-center gap-2">
-                <User size={20} className="text-leaf-green" />
+          {/* Customer Information */}
+          <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
+            <div className="flex items-center gap-1 mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <User size={20} className="text-[#487C47]" />
                 Customer Information
               </h2>
+              <TitleBadge text="ข้อมูลลูกค้า" />
+            </div>
+            <div className="bg-white rounded-lg p-4">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Full Name</label>
-                    <div className="text-d-grey-5 font-medium">{contract.customer.name}</div>
+                    <label className="text-sm font-medium text-gray-600">Full Name</label>
+                    <div className="text-gray-900 font-medium">{contract.customer.name}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Phone Number</label>
-                    <div className="text-d-grey-5 flex items-center gap-2">
-                      <Phone size={16} className="text-clay-grey" />
+                    <label className="text-sm font-medium text-gray-600">Phone Number</label>
+                    <div className="text-gray-900 flex items-center gap-2">
+                      <Phone size={16} className="text-gray-500" />
                       {contract.customer.phone}
                     </div>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">ID Number</label>
-                    <div className="text-d-grey-5 font-mono">{contract.customer.idNumber}</div>
+                    <label className="text-sm font-medium text-gray-600">ID Number</label>
+                    <div className="text-gray-900 font-mono">{contract.customer.idNumber}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Address</label>
-                    <div className="text-d-grey-5 flex items-start gap-2">
-                      <MapPin size={16} className="text-clay-grey mt-1 flex-shrink-0" />
+                    <label className="text-sm font-medium text-gray-600">Address</label>
+                    <div className="text-gray-900 flex items-start gap-2">
+                      <MapPin size={16} className="text-gray-500 mt-1 flex-shrink-0" />
                       <span>{contract.customer.address}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Item Information */}
-            <div className="bg-white rounded-xl shadow-sm border border-l-grey-2 p-6">
-              <h2 className="text-lg font-semibold text-d-grey-5 mb-4 flex items-center gap-2">
-                <Package size={20} className="text-leaf-green" />
+          {/* Item Information */}
+          <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
+            <div className="flex items-center gap-1 mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Package size={20} className="text-[#487C47]" />
                 Item Information
               </h2>
+              <TitleBadge text="ข้อมูลสินค้า" />
+            </div>
+            <div className="bg-white rounded-lg p-4">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Brand & Model</label>
-                    <div className="text-d-grey-5 font-medium">{contract.item.brand} {contract.item.model}</div>
+                    <label className="text-sm font-medium text-gray-600">Brand & Model</label>
+                    <div className="text-gray-900 font-medium">{contract.item.brand} {contract.item.model}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Type</label>
-                    <div className="text-d-grey-5">{contract.item.type}</div>
+                    <label className="text-sm font-medium text-gray-600">Type</label>
+                    <div className="text-gray-900">{contract.item.type}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Serial Number</label>
-                    <div className="text-d-grey-5 font-mono">{contract.item.serialNo}</div>
+                    <label className="text-sm font-medium text-gray-600">Serial Number</label>
+                    <div className="text-gray-900 font-mono">{contract.item.serialNo}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Accessories</label>
-                    <div className="text-d-grey-5">{contract.item.accessories}</div>
+                    <label className="text-sm font-medium text-gray-600">Accessories</label>
+                    <div className="text-gray-900">{contract.item.accessories}</div>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Condition</label>
+                    <label className="text-sm font-medium text-gray-600">Condition</label>
                     <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-l-grey-3 rounded-full h-2">
-                        <div 
-                          className="bg-leaf-green h-2 rounded-full transition-all"
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-[#487C47] h-2 rounded-full transition-all"
                           style={{ width: `${contract.item.condition}%` }}
                         ></div>
                       </div>
-                      <span className="text-d-grey-5 font-medium">{contract.item.condition}%</span>
+                      <span className="text-gray-900 font-medium">{contract.item.condition}%</span>
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Defects</label>
-                    <div className="text-d-grey-5">{contract.item.defects || 'None reported'}</div>
+                    <label className="text-sm font-medium text-gray-600">Defects</label>
+                    <div className="text-gray-900">{contract.item.defects || 'None reported'}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-clay-grey">Note</label>
-                    <div className="text-d-grey-5">{contract.item.note || 'No additional notes'}</div>
+                    <label className="text-sm font-medium text-gray-600">Note</label>
+                    <div className="text-gray-900">{contract.item.note || 'No additional notes'}</div>
                   </div>
                 </div>
               </div>
@@ -608,12 +609,12 @@ export default function ContractDetailPage() {
               {/* Item Images */}
               {contract.item.images.length > 0 && (
                 <div className="mt-6">
-                  <label className="text-sm font-medium text-clay-grey mb-3 block">Item Images</label>
+                  <label className="text-sm font-medium text-gray-600 mb-3 block">Item Images</label>
                   <div className="grid grid-cols-3 gap-4">
                     {contract.item.images.map((image, index) => (
-                      <div key={index} className="aspect-square bg-l-grey-1 rounded-lg overflow-hidden">
-                        <div className="w-full h-full bg-gradient-to-br from-l-grey-2 to-l-grey-3 flex items-center justify-center">
-                          <Package size={32} className="text-clay-grey" />
+                      <div key={index} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                          <Package size={32} className="text-gray-400" />
                         </div>
                       </div>
                     ))}
@@ -621,155 +622,171 @@ export default function ContractDetailPage() {
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Transaction History */}
-            <div className="bg-white rounded-xl shadow-sm border border-l-grey-2 p-6">
-              <h2 className="text-lg font-semibold text-d-grey-5 mb-4 flex items-center gap-2">
-                <Clock size={20} className="text-leaf-green" />
+          {/* Transaction History */}
+          <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
+            <div className="flex items-center gap-1 mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Clock size={20} className="text-[#487C47]" />
                 Transaction History
               </h2>
+              <TitleBadge text="ประวัติการทำรายการ" />
+            </div>
+            <div className="bg-white rounded-lg p-4">
               {contract.transactionHistory.length > 0 ? (
                 <div className="space-y-3">
-                  {contract.transactionHistory.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 bg-l-grey-1 rounded-lg">
+                  {contract.transactionHistory
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .map((transaction) => (
+                    <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-leaf-green rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-[#487C47] rounded-full flex items-center justify-center">
                           <DollarSign size={16} className="text-white" />
                         </div>
                         <div>
-                          <div className="font-medium text-d-grey-5">
+                          <div className="font-medium text-gray-900">
                             {transaction.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                           </div>
-                          <div className="text-sm text-clay-grey">
+                          <div className="text-sm text-gray-500">
                             {formatDate(transaction.date)} • {transaction.paymentMethod}
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-d-grey-5">{formatCurrency(transaction.amount)}</div>
+                        <div className="font-semibold text-gray-900">{formatCurrency(transaction.amount)} THB</div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-clay-grey">
+                <div className="text-center py-8 text-gray-500">
                   <Clock size={48} className="mx-auto mb-2 opacity-50" />
                   <p>No transactions yet</p>
                 </div>
               )}
             </div>
           </div>
+        </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Loan Summary */}
-            <div className="bg-white rounded-xl shadow-sm border border-l-grey-2 p-6">
-              <h3 className="text-lg font-semibold text-d-grey-5 mb-4 flex items-center gap-2">
-                <DollarSign size={20} className="text-leaf-green" />
+        {/* Right Panel - Scrollable */}
+        <div className="w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+          {/* Loan Summary */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-1 mb-4">
+              <h3 className="text-xl font-semibold flex items-center gap-2">
+                <DollarSign size={20} className="text-[#487C47]" />
                 Loan Summary
               </h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-clay-grey">AI Estimated Price:</span>
-                  <span className="font-medium text-d-grey-5">{formatCurrency(contract.pawnDetails.aiEstimatedPrice)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-clay-grey">Principal Amount:</span>
-                  <span className="font-semibold text-d-grey-5">{formatCurrency(contract.pawnDetails.pawnedPrice)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-clay-grey">Interest Rate:</span>
-                  <span className="font-medium text-d-grey-5">{contract.pawnDetails.interestRate}% per month</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-clay-grey">Period:</span>
-                  <span className="font-medium text-d-grey-5">{contract.pawnDetails.periodDays} days</span>
-                </div>
-                <div className="border-t border-l-grey-2 pt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-clay-grey">Interest Amount:</span>
-                    <span className="font-medium text-semantic-orange">{formatCurrency(calculateInterest())}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-lg mt-2">
-                    <span className="font-semibold text-d-grey-5">Total Repayment:</span>
-                    <span className="font-bold text-leaf-green">{formatCurrency(calculateTotal())}</span>
-                  </div>
-                </div>
-              </div>
+              <TitleBadge text="สรุปเงินกู้" />
             </div>
-
-            {/* Important Dates */}
-            <div className="bg-white rounded-xl shadow-sm border border-l-grey-2 p-6">
-              <h3 className="text-lg font-semibold text-d-grey-5 mb-4 flex items-center gap-2">
-                <Calendar size={20} className="text-leaf-green" />
-                Important Dates
-              </h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium text-clay-grey">Start Date</label>
-                  <div className="text-d-grey-5">{formatDate(contract.dates.startDate)}</div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-clay-grey">Due Date</label>
-                  <div className="text-d-grey-5">{formatDate(contract.dates.dueDate)}</div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-clay-grey">Days Remaining</label>
-                  <div className="text-d-grey-5">
-                    {Math.ceil((new Date(contract.dates.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
-                  </div>
-                </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">AI Estimated Price:</span>
+                <span className="font-medium text-gray-900">{formatCurrency(contract.pawnDetails.aiEstimatedPrice)} THB</span>
               </div>
-            </div>
-
-            {/* Actions */}
-            <div className="bg-white rounded-xl shadow-sm border border-l-grey-2 p-6">
-              <h3 className="text-lg font-semibold text-d-grey-5 mb-4">Actions</h3>
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleAction('redeem')}
-                  className="w-full px-4 py-3 bg-leaf-green text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  <CheckCircle2 size={16} />
-                  Redeem
-                </button>
-                <button
-                  onClick={() => handleAction('pay_interest')}
-                  className="w-full px-4 py-3 bg-semantic-orange text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  <CreditCard size={16} />
-                  Pay Interest
-                </button>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleAction('decrease_loan')}
-                    className="px-4 py-3 border border-navy-blue text-navy-blue rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Minus size={16} />
-                    Decrease Loan
-                  </button>
-                  <button
-                    onClick={() => handleAction('increase_loan')}
-                    className="px-4 py-3 border border-leaf-green text-leaf-green rounded-lg hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Plus size={16} />
-                    Increase Loan
-                  </button>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Principal Amount:</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(contract.pawnDetails.pawnedPrice)} THB</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Interest Rate:</span>
+                <span className="font-medium text-gray-900">{contract.pawnDetails.interestRate}% per month</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Period:</span>
+                <span className="font-medium text-gray-900">{contract.pawnDetails.periodDays} days</span>
+              </div>
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Interest Amount:</span>
+                  <span className="font-medium text-orange-600">{formatCurrency(calculateInterest())} THB</span>
                 </div>
-                <button
-                  onClick={() => handleAction('suspend')}
-                  className="w-full px-4 py-3 bg-semantic-red text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Pause size={16} />
-                  Suspend
-                </button>
+                <div className="flex justify-between items-center text-lg mt-2">
+                  <span className="font-semibold text-gray-900">Total Repayment:</span>
+                  <span className="font-bold text-[#487C47]">{formatCurrency(calculateTotal())} THB</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {renderActionModal()}
+          {/* Important Dates */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-1 mb-4">
+              <h3 className="text-xl font-semibold flex items-center gap-2">
+                <Calendar size={20} className="text-[#487C47]" />
+                Important Dates
+              </h3>
+              <TitleBadge text="วันที่สำคัญ" />
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600">Start Date</label>
+                <div className="text-gray-900">{formatDate(contract.dates.startDate)}</div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Due Date</label>
+                <div className="text-gray-900">{formatDate(contract.dates.dueDate)}</div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Days Remaining</label>
+                <div className="text-gray-900">
+                  {Math.ceil((new Date(contract.dates.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-1 mb-4">
+              <h3 className="text-xl font-semibold">Actions</h3>
+              <TitleBadge text="การจัดการ" />
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => handleAction('redeem')}
+                className="w-full px-4 py-3 bg-[#487C47] text-white rounded-lg hover:bg-[#386337] transition-colors flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={16} />
+                Redeem
+              </button>
+              <button
+                onClick={() => handleAction('pay_interest')}
+                className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+              >
+                <CreditCard size={16} />
+                Pay Interest
+              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleAction('decrease_loan')}
+                  className="px-4 py-3 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Minus size={16} />
+                  Decrease
+                </button>
+                <button
+                  onClick={() => handleAction('increase_loan')}
+                  className="px-4 py-3 border border-[#487C47] text-[#487C47] rounded-lg hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus size={16} />
+                  Increase
+                </button>
+              </div>
+              <button
+                onClick={() => handleAction('suspend')}
+                className="w-full px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+              >
+                <Pause size={16} />
+                Suspend
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </AppLayout>
+
+      {renderActionModal()}
+    </FixedLayout>
   );
 }

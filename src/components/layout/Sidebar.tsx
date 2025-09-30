@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { IoHome } from "react-icons/io5"
-import { LuPackage } from "react-icons/lu";
+import { PiPackageFill } from "react-icons/pi";
 import { AiFillFileText } from "react-icons/ai";
 import { ImProfile } from "react-icons/im";
 import { 
@@ -14,6 +14,12 @@ import {
   Users,
   CreditCard
 } from 'lucide-react';
+import { Poppins } from 'next/font/google';
+
+const inter = Poppins({
+  weight: '400',
+  subsets: ['latin'],
+})
 
 const menuItems = [
   {
@@ -24,7 +30,7 @@ const menuItems = [
   },
   {
     name: 'Pawn Entry',
-    icon: LuPackage,
+    icon: PiPackageFill,
     href: '/pawn-entry',
     description: 'Create new contracts'
   },
@@ -60,21 +66,11 @@ export default function Sidebar() {
   return (
     <div className="bg-[#F5F4F2] border-r border-l-grey-2 w-[12.5rem] min-h-screen flex flex-col">
       {/* Logo */}
-      <div className="p-[1rem] border-b border-l-grey-2">
-      <Link href="/dashboard" className="block">
-        <Image 
-          src="/images/Logo.avif" 
-          alt="Pawn360 Logo" 
-          width={130} 
-          height={48} 
-          className="mx-auto" 
-        />
-      </Link>
-      </div>
+      
 
       {/* Navigation Menu */}
       <nav className="flex-1 py-[1rem]">
-        <div className="space-y-2 px-3">
+        <div className="space-y-2 px-5">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || pathname.startsWith(item.href);
@@ -83,21 +79,18 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-full py-2 px-4 transition-colors duration-200 ${
+                className={`flex items-center gap-3 rounded-xl py-2 px-1 transition-colors duration-200 ${
                   isActive
-                    ? 'bg-[#c8e6c9] text-[#2e7d32] font-medium' // Style สำหรับ Active
-                    : 'text-[#555] hover:bg-gray-200' // Style สำหรับ Inactive
+                    ? 'bg-[#B4CDB9] text-[#B4CDB9] font-medium hover:text-[#0E5D1E] hover:bg-[#5E9268]' // Style สำหรับ Active
+                    : 'text-[#555] hover:text-[#0E5D1E] hover:bg-[#C8D6C9]' // Style สำหรับ Inactive
                 }`}
                 style={{ minHeight: '44px', maxHeight: '44px' }}
               >
                 {/* Icon Container */}
                 <div className="relative flex-shrink-0" style={{ minWidth: '44px', maxWidth: '44px', minHeight: '44px', width: '44px' }}>
-                  <div className={`flex items-center justify-center rounded w-8 h-8 m-2 ${
-                    isActive ? 'bg-white/20' : 'bg-transparent'
-                  }`}>
+                  <div className={`flex items-center justify-center rounded w-8 h-8 m-2`}>
                     <Icon 
                       size={20} 
-                      fill={isActive ? '#0E5D1E' : 'none'}
                       className={`${
                         isActive ? 'text-[#0E5D1E]' : 'text-[#9A9694]'
                       }`} 
@@ -107,8 +100,8 @@ export default function Sidebar() {
                 
                 {/* Text Container */}
                 <div className="flex-1 min-w-0">
-                  <h6 className={`text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis ${
-                    isActive ? 'text-[#0E5D1E]' : 'text-[#9A9694]'
+                  <h6 className={`text-[0.785rem] font-[500] whitespace-nowrap overflow-hidden text-ellipsis ${inter.className} ${
+                    isActive ? 'text-[#0E5D1E] hover:text-[#0A4215]' : 'text-[#9A9694] hover:text-[#5E9268]'
                   }`}>
                     {item.name}
                   </h6>
@@ -122,30 +115,33 @@ export default function Sidebar() {
       {/* User Info & Logout */}
       <div className="border-t border-l-grey-2 p-4">
         {/* User Info */}
-        <div className="mb-4 px-2">
-          <div className="text-sm font-medium text-d-grey-5">John Doe</div>
-          <div className="text-xs text-clay-grey">Admin • Gold Pawn Shop</div>
-        </div>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center px-4 py-3 text-clay-grey hover:text-semantic-red hover:bg-semantic-l-red rounded-lg transition-all duration-200 group ${inter.className}"
+        >
+          <LogOut size={20} className="mr-3 group-hover:text-semantic-red" />
+          <span className="text-[0.785rem] font-[500] whitespace-nowrap overflow-hidden text-ellipsis ${inter.className} text-clay-grey">Logout</span>
+        </button>
 
         {/* Quick Stats */}
-        <div className="bg-l-grey-1 rounded-lg p-3 mb-4">
+        <div className="bg-l-grey-1 rounded-lg p-3 mb-4 ${inter.className}">
           <div className="flex justify-between items-center text-xs">
-            <span className="text-clay-grey">Active Contracts</span>
-            <span className="font-semibold text-leaf-green">24</span>
+            <span className="text-clay-grey"></span>
+            <span className="font-semibold text-leaf-green"></span>
           </div>
           <div className="flex justify-between items-center text-xs mt-1">
-            <span className="text-clay-grey">Today's Value</span>
-            <span className="font-semibold text-navy-blue">₿120K</span>
+            <span className="text-clay-grey"></span>
+            <span className="font-semibold text-navy-blue"></span>
           </div>
         </div>
 
         {/* Logout Button */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center px-4 py-3 text-clay-grey hover:text-semantic-red hover:bg-semantic-l-red rounded-lg transition-all duration-200 group"
+          className="w-full flex items-center px-4 py-3 text-clay-grey hover:text-semantic-red hover:bg-semantic-l-red rounded-lg transition-all duration-200 group ${inter.className}"
         >
           <LogOut size={20} className="mr-3 group-hover:text-semantic-red" />
-          <span className="font-medium">Logout</span>
+          <span className="text-[0.785rem] font-[500] whitespace-nowrap overflow-hidden text-ellipsis ${inter.className} text-clay-grey">Logout</span>
         </button>
       </div>
     </div>

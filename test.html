@@ -1,0 +1,295 @@
+<html>
+  <head>
+    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
+    <link
+      rel="stylesheet"
+      as="style"
+      onload="this.rel='stylesheet'"
+      href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900"
+    />
+
+    <title>Stitch Design</title>
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64," />
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  </head>
+  <body>
+    <div
+      class="relative flex h-auto min-h-screen w-full flex-col bg-slate-50 group/design-root overflow-x-hidden"
+      style="--checkbox-tick-svg: url('data:image/svg+xml,%3csvg viewBox=%270 0 16 16%27 fill=%27rgb(248,250,252)%27 xmlns=%27http://www.w3.org/2000/svg%27%3e%3cpath d=%27M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z%27/%3e%3c/svg%3e'); font-family: Inter, &quot;Noto Sans&quot;, sans-serif;"
+    >
+      <div class="layout-container flex h-full grow flex-col">
+        <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#e7edf4] px-10 py-3">
+          <div class="flex items-center gap-8">
+            <div class="flex items-center gap-4 text-[#0d141c]">
+              <div class="size-4">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6H42L36 24L42 42H6L12 24L6 6Z" fill="currentColor"></path></svg>
+              </div>
+              <h2 class="text-[#0d141c] text-lg font-bold leading-tight tracking-[-0.015em]">MarketPulse</h2>
+            </div>
+            <div class="flex items-center gap-9">
+              <a class="text-[#0d141c] text-sm font-medium leading-normal" href="#">Markets</a>
+              <a class="text-[#0d141c] text-sm font-medium leading-normal" href="#">News</a>
+              <a class="text-[#0d141c] text-sm font-medium leading-normal" href="#">Watchlist</a>
+              <a class="text-[#0d141c] text-sm font-medium leading-normal" href="#">Portfolio</a>
+            </div>
+          </div>
+          <div class="flex flex-1 justify-end gap-8">
+            <label class="flex flex-col min-w-40 !h-10 max-w-64">
+              <div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+                <div
+                  class="text-[#49739c] flex border-none bg-[#e7edf4] items-center justify-center pl-4 rounded-l-lg border-r-0"
+                  data-icon="MagnifyingGlass"
+                  data-size="24px"
+                  data-weight="regular"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
+                    <path
+                      d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"
+                    ></path>
+                  </svg>
+                </div>
+                <input
+                  placeholder="Search"
+                  class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-[#0d141c] focus:outline-0 focus:ring-0 border-none bg-[#e7edf4] focus:border-none h-full placeholder:text-[#49739c] px-4 rounded-l-none border-l-0 pl-2 text-base font-normal leading-normal"
+                  value=""
+                />
+              </div>
+            </label>
+            <button
+              class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-[#e7edf4] text-[#0d141c] gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5"
+            >
+              <div class="text-[#0d141c]" data-icon="Bell" data-size="20px" data-weight="regular">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+                  <path
+                    d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"
+                  ></path>
+                </svg>
+              </div>
+            </button>
+            <div
+              class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10"
+              style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBR87KAXiBz8d64j1YH1EArpLbQ_s8Srfb4Gm5Rp8r7xESKyTc5jIRjuw1ofBC_EL39egDWI10htRi5BwS7Y_7p01T0GZHxNfUBL2t5GyBUMNlM0HBBmh0C3mh_Y8TuUjsXKETJfTRaRLXjXXCIV-xvbbOesFjAcJNdkFw9LRDtpVKhM_lqSG7i8U_zHbonX0F1x3Qzv1KIsGbYKTAz5Yt7lGDxjtUKt1JCL3id20IEDRBj1zb3xHKZjetVhd2R3FqgX8LJOEFQ3-YR");'
+            ></div>
+          </div>
+        </header>
+        <div class="px-40 flex flex-1 justify-center py-5">
+          <div class="layout-content-container flex flex-col max-w-[960px] flex-1">
+            <div class="flex flex-wrap justify-between gap-3 p-4">
+              <div class="flex min-w-72 flex-col gap-3">
+                <p class="text-[#0d141c] tracking-light text-[32px] font-bold leading-tight">Crude Oil (WTI)</p>
+                <p class="text-[#49739c] text-sm font-normal leading-normal">CL1:COM (USD/bbl.)</p>
+              </div>
+              <button
+                class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-8 px-4 bg-[#e7edf4] text-[#0d141c] text-sm font-medium leading-normal"
+              >
+                <span class="truncate">+ Follow</span>
+              </button>
+            </div>
+            <h1 class="text-[#0d141c] tracking-light text-[32px] font-bold leading-tight px-4 text-left pb-3 pt-6">$75.25</h1>
+            <p class="text-[#49739c] text-sm font-normal leading-normal pb-3 pt-1 px-4">+$0.50 (+0.67%)</p>
+            <p class="text-[#49739c] text-sm font-normal leading-normal pb-3 pt-1 px-4">As of 10:30 AM EST</p>
+            <div class="pb-3">
+              <div class="flex border-b border-[#cedbe8] px-4 gap-8">
+                <a class="flex flex-col items-center justify-center border-b-[3px] border-b-[#0b72da] text-[#0d141c] pb-[13px] pt-4" href="#">
+                  <p class="text-[#0d141c] text-sm font-bold leading-normal tracking-[0.015em]">Summary</p>
+                </a>
+                <a class="flex flex-col items-center justify-center border-b-[3px] border-b-transparent text-[#49739c] pb-[13px] pt-4" href="#">
+                  <p class="text-[#49739c] text-sm font-bold leading-normal tracking-[0.015em]">Related News</p>
+                </a>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-4 px-4 py-6">
+              <div class="flex min-w-72 flex-1 flex-col gap-2">
+                <p class="text-[#0d141c] text-base font-medium leading-normal">Crude Oil (WTI) Price History</p>
+                <p class="text-[#0d141c] tracking-light text-[32px] font-bold leading-tight truncate">$75.25</p>
+                <div class="flex gap-1">
+                  <p class="text-[#49739c] text-base font-normal leading-normal">1D</p>
+                  <p class="text-[#078838] text-base font-medium leading-normal">+0.67%</p>
+                </div>
+                <div class="flex min-h-[180px] flex-1 flex-col gap-8 py-4">
+                  <svg width="100%" height="148" viewBox="-3 0 478 150" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+                    <path
+                      d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25V149H326.769H0V109Z"
+                      fill="url(#paint0_linear_1131_5935)"
+                    ></path>
+                    <path
+                      d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25"
+                      stroke="#49739c"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                    ></path>
+                    <defs>
+                      <linearGradient id="paint0_linear_1131_5935" x1="236" y1="1" x2="236" y2="149" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#e7edf4"></stop>
+                        <stop offset="1" stop-color="#e7edf4" stop-opacity="0"></stop>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div class="flex justify-around">
+                    <p class="text-[#49739c] text-[13px] font-bold leading-normal tracking-[0.015em]">Jan</p>
+                    <p class="text-[#49739c] text-[13px] font-bold leading-normal tracking-[0.015em]">Feb</p>
+                    <p class="text-[#49739c] text-[13px] font-bold leading-normal tracking-[0.015em]">Mar</p>
+                    <p class="text-[#49739c] text-[13px] font-bold leading-normal tracking-[0.015em]">Apr</p>
+                    <p class="text-[#49739c] text-[13px] font-bold leading-normal tracking-[0.015em]">May</p>
+                    <p class="text-[#49739c] text-[13px] font-bold leading-normal tracking-[0.015em]">Jun</p>
+                    <p class="text-[#49739c] text-[13px] font-bold leading-normal tracking-[0.015em]">Jul</p>
+                  </div>
+                </div>
+              </div>
+              <div class="flex min-w-72 flex-1 flex-col gap-2"><p class="text-[#49739c] text-base font-normal leading-normal">1M</p></div>
+              <div class="flex min-w-72 flex-1 flex-col gap-2"><p class="text-[#49739c] text-base font-normal leading-normal">6M</p></div>
+              <div class="flex min-w-72 flex-1 flex-col gap-2"><p class="text-[#49739c] text-base font-normal leading-normal">1Y</p></div>
+              <div class="flex min-w-72 flex-1 flex-col gap-2"><p class="text-[#49739c] text-base font-normal leading-normal">5Y</p></div>
+            </div>
+            <h2 class="text-[#0d141c] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Overview</h2>
+            <div class="p-4 grid grid-cols-2">
+              <div class="flex flex-col gap-1 border-t border-solid border-t-[#cedbe8] py-4 pr-2">
+                <p class="text-[#49739c] text-sm font-normal leading-normal">OPEN</p>
+                <p class="text-[#0d141c] text-sm font-normal leading-normal">$74.80</p>
+              </div>
+              <div class="flex flex-col gap-1 border-t border-solid border-t-[#cedbe8] py-4 pl-2">
+                <p class="text-[#49739c] text-sm font-normal leading-normal">PREV CLOSE</p>
+                <p class="text-[#0d141c] text-sm font-normal leading-normal">$74.75</p>
+              </div>
+              <div class="flex flex-col gap-1 border-t border-solid border-t-[#cedbe8] py-4 pr-2">
+                <p class="text-[#49739c] text-sm font-normal leading-normal">VOLUME</p>
+                <p class="text-[#0d141c] text-sm font-normal leading-normal">150,000</p>
+              </div>
+              <div class="flex flex-col gap-1 border-t border-solid border-t-[#cedbe8] py-4 pl-2">
+                <p class="text-[#49739c] text-sm font-normal leading-normal">DAY RANGE</p>
+                <p class="text-[#0d141c] text-sm font-normal leading-normal">$74.50 - $75.50</p>
+              </div>
+              <div class="flex flex-col gap-1 border-t border-solid border-t-[#cedbe8] py-4 pr-2 col-span-2 pr-[50%]">
+                <p class="text-[#49739c] text-sm font-normal leading-normal">52 WEEK RANGE</p>
+                <p class="text-[#0d141c] text-sm font-normal leading-normal">$65.00 - $85.00</p>
+              </div>
+            </div>
+            <h2 class="text-[#0d141c] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">AI-Powered Insights &amp; Forecast</h2>
+            <p class="text-[#0d141c] text-base font-normal leading-normal pb-3 pt-1 px-4">
+              Crude oil prices are currently trading at $75.25, reflecting a slight increase of 0.67% today. Market sentiment remains cautiously optimistic, influenced by recent
+              geopolitical developments and supply chain adjustments.
+            </p>
+            <p class="text-[#0d141c] text-base font-normal leading-normal pb-3 pt-1 px-4">Key Insights:</p>
+            <div class="px-4">
+              <label class="flex gap-x-3 py-3 flex-row">
+                <input
+                  type="checkbox"
+                  class="h-5 w-5 rounded border-[#cedbe8] border-2 bg-transparent text-[#0b72da] checked:bg-[#0b72da] checked:border-[#0b72da] checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0 focus:border-[#cedbe8] focus:outline-none"
+                />
+                <p class="text-[#0d141c] text-base font-normal leading-normal">Geopolitical tensions in the Middle East continue to support prices.</p>
+              </label>
+              <label class="flex gap-x-3 py-3 flex-row">
+                <input
+                  type="checkbox"
+                  class="h-5 w-5 rounded border-[#cedbe8] border-2 bg-transparent text-[#0b72da] checked:bg-[#0b72da] checked:border-[#0b72da] checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0 focus:border-[#cedbe8] focus:outline-none"
+                />
+                <p class="text-[#0d141c] text-base font-normal leading-normal">OPEC+ production cuts are maintaining a tight supply.</p>
+              </label>
+              <label class="flex gap-x-3 py-3 flex-row">
+                <input
+                  type="checkbox"
+                  class="h-5 w-5 rounded border-[#cedbe8] border-2 bg-transparent text-[#0b72da] checked:bg-[#0b72da] checked:border-[#0b72da] checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0 focus:border-[#cedbe8] focus:outline-none"
+                />
+                <p class="text-[#0d141c] text-base font-normal leading-normal">Global demand shows signs of recovery, particularly from Asia.</p>
+              </label>
+            </div>
+            <div class="px-4 py-3 @container">
+              <div class="flex overflow-hidden rounded-lg border border-[#cedbe8] bg-slate-50">
+                <table class="flex-1">
+                  <thead>
+                    <tr class="bg-slate-50">
+                      <th class="table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-120 px-4 py-3 text-left text-[#0d141c] w-[400px] text-sm font-medium leading-normal">
+                        Forecast Period
+                      </th>
+                      <th class="table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-240 px-4 py-3 text-left text-[#0d141c] w-[400px] text-sm font-medium leading-normal">
+                        Predicted Price
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="border-t border-t-[#cedbe8]">
+                      <td class="table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-120 h-[72px] px-4 py-2 w-[400px] text-[#0d141c] text-sm font-normal leading-normal">7-Day</td>
+                      <td class="table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-240 h-[72px] px-4 py-2 w-[400px] text-[#49739c] text-sm font-normal leading-normal">$76.50</td>
+                    </tr>
+                    <tr class="border-t border-t-[#cedbe8]">
+                      <td class="table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-120 h-[72px] px-4 py-2 w-[400px] text-[#0d141c] text-sm font-normal leading-normal">30-Day</td>
+                      <td class="table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-240 h-[72px] px-4 py-2 w-[400px] text-[#49739c] text-sm font-normal leading-normal">$78.00</td>
+                    </tr>
+                    <tr class="border-t border-t-[#cedbe8]">
+                      <td class="table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-120 h-[72px] px-4 py-2 w-[400px] text-[#0d141c] text-sm font-normal leading-normal">90-Day</td>
+                      <td class="table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-240 h-[72px] px-4 py-2 w-[400px] text-[#49739c] text-sm font-normal leading-normal">$80.00</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <style>
+                          @container(max-width:120px){.table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-120{display: none;}}
+                @container(max-width:240px){.table-06d9c401-6b18-4a08-bf3c-046fa39106fa-column-240{display: none;}}
+              </style>
+            </div>
+          </div>
+          <div class="layout-content-container flex flex-col">
+            <div class="flex flex-wrap justify-between gap-3 p-4">
+              <div class="flex min-w-72 flex-col gap-3">
+                <p class="text-[#0d141c] tracking-light text-[32px] font-bold leading-tight">Crude Oil (WTI)</p>
+                <p class="text-[#49739c] text-sm font-normal leading-normal">CL1:COM (USD/bbl.)</p>
+              </div>
+              <button
+                class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-8 px-4 bg-[#e7edf4] text-[#0d141c] text-sm font-medium leading-normal"
+              >
+                <span class="truncate">+ Follow</span>
+              </button>
+            </div>
+            <h1 class="text-[#0d141c] tracking-light text-[32px] font-bold leading-tight px-4 text-left pb-3 pt-6">$75.25</h1>
+            <p class="text-[#49739c] text-sm font-normal leading-normal pb-3 pt-1 px-4">+$0.50 (+0.67%)</p>
+            <p class="text-[#49739c] text-sm font-normal leading-normal pb-3 pt-1 px-4">As of 10:30 AM EST</p>
+            <div class="pb-3">
+              <div class="flex border-b border-[#cedbe8] px-4 gap-8">
+                <a class="flex flex-col items-center justify-center border-b-[3px] border-b-transparent text-[#49739c] pb-[13px] pt-4" href="#">
+                  <p class="text-[#49739c] text-sm font-bold leading-normal tracking-[0.015em]">Summary</p>
+                </a>
+                <a class="flex flex-col items-center justify-center border-b-[3px] border-b-[#0b72da] text-[#0d141c] pb-[13px] pt-4" href="#">
+                  <p class="text-[#0d141c] text-sm font-bold leading-normal tracking-[0.015em]">Related News</p>
+                </a>
+              </div>
+            </div>
+            <h2 class="text-[#0d141c] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Related News</h2>
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 p-4">
+              <div class="flex flex-col gap-3 pb-3">
+                <div
+                  class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg"
+                  style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAugwXCvEH_FOBZ2NFsKCXhfOatHqKxeEe8YcfCVGbOygTI74uagEywIkHEYEcb2-yf4sbcD0N1foPsS1Ur55jzcbOKC3I5cl8mUsjUiYvk4GZbY5vb_PomE5J6rua8iaVSqKCUJNimXDp1K5_IUCY3HK3DMzG-jdPBfq80E9WJoXeirf-fbzUQdr5enZHzBE_ptYS9SjzRbyopyLXVvtQxQf7BpelvWX5Kql2YfIWLgk0_HBUjcmMB1PmRxbewub0kBby8sNmHg55x");'
+                ></div>
+                <div>
+                  <p class="text-[#0d141c] text-base font-medium leading-normal">Oil Prices Surge Amidst Supply Concerns</p>
+                  <p class="text-[#49739c] text-sm font-normal leading-normal">Energy</p>
+                </div>
+              </div>
+              <div class="flex flex-col gap-3 pb-3">
+                <div
+                  class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg"
+                  style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCB2v2D5XtGLIkJDiCsyZLAcWC4g96g7DbWs66eBcEsWGNbbOM1A4ybbOV_SbA4FHKvdc9UpupjrLfdI5QG_oC3B6weYqyjusd1tHmdpg8-L40bTTSBFCweLIrXKe252o_4qQa08_ITafjYhMAdjirhjfPZUIWUoRmR2OR7lATzmDt2-LtUsJSqY3EcsB9hwNZw8_6_toZH24AIT73VVwnO9BuN-rDhegmpofUjjZKC44yyGAhQvWnxH7wVjmmQmwqMwPpIg17tniao");'
+                ></div>
+                <div>
+                  <p class="text-[#0d141c] text-base font-medium leading-normal">Market Analysts Predict Continued Volatility in Energy Sector</p>
+                  <p class="text-[#49739c] text-sm font-normal leading-normal">Market Analysis</p>
+                </div>
+              </div>
+              <div class="flex flex-col gap-3 pb-3">
+                <div
+                  class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg"
+                  style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCRhdpITAd3Kk0R-f3OWtjymH5fgAKQBcKtdVpJkiexA73m0c7pH1yWvPZ7kl3td7kbw1onMKdxdr430qbmckza_xNmGTgfT9WGMMo-5Q6cgbpKP55AL1J0Y8EgizQniBGd2aIZtGyZC6mik1BchJIvmJVZgVDdq5uIB0hiuRKpR_dfZfYrVNSkU-4yBZ0LmorWL00ahP_GsNXGi6sK6-IfxHUlrfM3SasFpBbvJH3soBarKVlNUCeC0_8oKYbbVxJCl73WYcc4NPT8");'
+                ></div>
+                <div>
+                  <p class="text-[#0d141c] text-base font-medium leading-normal">Geopolitical Risks Fuel Uncertainty in Oil Markets</p>
+                  <p class="text-[#49739c] text-sm font-normal leading-normal">Geopolitics</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
