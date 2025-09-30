@@ -138,13 +138,21 @@ export default function AccountPage() {
       const token = localStorage.getItem('access_token');
       if (!token) return;
 
+      // Map frontend field names to backend expected field names
+      const backendData = {
+        store_name: newStoreData.storeName,
+        address: newStoreData.address,
+        phone: newStoreData.phone,
+        tax_id: newStoreData.taxId
+      };
+
       const response = await fetch('http://127.0.0.1:8000/stores', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(newStoreData)
+        body: JSON.stringify(backendData)
       });
 
       if (response.ok) {
@@ -323,21 +331,30 @@ export default function AccountPage() {
                           <ChevronDown size={14} />
                         </button>
                         {showStoreDropdown && (
-                          <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[200px] p-2">
+                          <div
+                            className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[200px] p-2"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          >
                             <div className="space-y-1">
                               {userStores.map((store, index) => (
-                                <label key={store._id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded text-sm">
+                                <label
+                                  key={store._id}
+                                  className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded text-sm cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedStoreIndex(index);
+                                    setShowStoreDropdown(false);
+                                  }}
+                                >
                                   <input
                                     type="radio"
                                     name="storeSelection"
                                     checked={selectedStoreIndex === index}
-                                    onChange={() => {
-                                      setSelectedStoreIndex(index);
-                                      setShowStoreDropdown(false);
-                                    }}
+                                    readOnly
                                     className="w-4 h-4"
                                   />
-                                  <span>{store.storeName || `Store ${index + 1}`}</span>
+                                  <span>🏪 {store.storeName || `Store ${index + 1}`}</span>
                                 </label>
                               ))}
                             </div>

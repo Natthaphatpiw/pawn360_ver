@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   MoreHorizontal,
   X
 } from 'lucide-react';
@@ -77,7 +78,7 @@ export default function ContractsPage() {
   const [showCalendarPopup, setShowCalendarPopup] = useState(false);
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const [userStores, setUserStores] = useState<any[]>([]);
 
   // Fetch user stores and contracts
@@ -107,9 +108,9 @@ export default function ContractsPage() {
           const userStoresList = await storesResponse.json();
           setUserStores(userStoresList);
 
-          // Set first store as default if no selection
-          if (userStoresList.length > 0 && selectedStoreId === 'all') {
-            setSelectedStoreId(userStoresList[0]._id);
+          // Set all stores as default selection
+          if (userStoresList.length > 0 && selectedStoreIds.length === 0) {
+            setSelectedStoreIds(userStoresList.map((store: any) => store._id));
           }
         }
       } catch (err) {
@@ -135,24 +136,9 @@ export default function ContractsPage() {
 
         let allContracts: Contract[] = [];
 
-        if (selectedStoreId === 'all') {
-          // Fetch contracts from all user's stores
-          for (const store of userStores) {
-            const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${store._id}`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            });
-
-            if (response.ok) {
-              const storeContracts = await response.json();
-              allContracts = [...allContracts, ...storeContracts];
-            }
-          }
-        } else {
-          // Fetch contracts from selected store only
-          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${selectedStoreId}`, {
+        // Fetch contracts from selected stores
+        for (const storeId of selectedStoreIds) {
+          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${storeId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -160,7 +146,8 @@ export default function ContractsPage() {
           });
 
           if (response.ok) {
-            allContracts = await response.json();
+            const storeContracts = await response.json();
+            allContracts = [...allContracts, ...storeContracts];
           }
         }
 
@@ -174,7 +161,7 @@ export default function ContractsPage() {
     };
 
     fetchContracts();
-  }, [selectedStoreId, userStores]);
+  }, [selectedStoreIds, userStores]);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -406,29 +393,9 @@ export default function ContractsPage() {
 
                         let searchResults: Contract[] = [];
 
-                        if (selectedStoreId === 'all') {
-                          // Search across all user's stores
-                          for (const store of userStores) {
-                            const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${store._id}`, {
-                              headers: {
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json'
-                              }
-                            });
-
-                            if (response.ok) {
-                              const storeContracts = await response.json();
-                              // Filter contracts by search query
-                              const filtered = storeContracts.filter((contract: Contract) =>
-                                contract.contractNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                contract.customer?.fullName.toLowerCase().includes(searchQuery.toLowerCase())
-                              );
-                              searchResults = [...searchResults, ...filtered];
-                            }
-                          }
-                        } else {
-                          // Search in selected store only
-                          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${selectedStoreId}`, {
+                        // Search across selected stores
+                        for (const storeId of selectedStoreIds) {
+                          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${storeId}`, {
                             headers: {
                               'Authorization': `Bearer ${token}`,
                               'Content-Type': 'application/json'
@@ -437,10 +404,12 @@ export default function ContractsPage() {
 
                           if (response.ok) {
                             const storeContracts = await response.json();
-                            searchResults = storeContracts.filter((contract: Contract) =>
+                            // Filter contracts by search query
+                            const filtered = storeContracts.filter((contract: Contract) =>
                               contract.contractNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               contract.customer?.fullName.toLowerCase().includes(searchQuery.toLowerCase())
                             );
+                            searchResults = [...searchResults, ...filtered];
                           }
                         }
 
@@ -577,34 +546,69 @@ export default function ContractsPage() {
           {/* Store Filter */}
           <div className="flex justify-end">
             <div className="relative">
-              <button
-                onClick={() => setShowStoreDropdown(!showStoreDropdown)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-              >
-                🏪 Store Filter
-                <ChevronDown size={14} />
-              </button>
+              <div className="flex items-center bg-white border border-gray-300 rounded-md">
+                <span className="px-3 py-1.5 text-sm">
+                  🏪 Store Filter
+                </span>
+                <button
+                  onClick={() => setShowStoreDropdown(!showStoreDropdown)}
+                  className="px-2 py-1.5 text-sm hover:bg-gray-50 transition-colors border-l border-gray-300"
+                >
+                  {showStoreDropdown ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              </div>
               {showStoreDropdown && (
-                <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[180px] p-2">
+                <div
+                  className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[180px] p-2"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   <div className="space-y-1">
-                    <label className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded text-sm">
+                    <label
+                      className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded text-sm cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const allStoreIds = userStores.map(store => store._id);
+                        if (selectedStoreIds.length === userStores.length) {
+                          // If all selected, deselect all
+                          setSelectedStoreIds([]);
+                        } else {
+                          // If not all selected, select all
+                          setSelectedStoreIds(allStoreIds);
+                        }
+                        // Keep dropdown open - don't close it
+                      }}
+                    >
                       <input
                         type="checkbox"
-                        checked={selectedStoreId === 'all'}
-                        onChange={() => setSelectedStoreId('all')}
+                        checked={selectedStoreIds.length === userStores.length}
+                        readOnly
                         className="w-4 h-4"
                       />
-                      <span>All Stores ({userStores.length})</span>
+                      <span>📊 All Stores ({userStores.length})</span>
                     </label>
                     {userStores.map((store, index) => (
-                      <label key={store._id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded text-sm">
+                      <label
+                        key={store._id}
+                        className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded text-sm cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const isSelected = selectedStoreIds.includes(store._id);
+                          if (isSelected) {
+                            setSelectedStoreIds(selectedStoreIds.filter(id => id !== store._id));
+                          } else {
+                            setSelectedStoreIds([...selectedStoreIds, store._id]);
+                          }
+                          // Keep dropdown open - don't close it
+                        }}
+                      >
                         <input
                           type="checkbox"
-                          checked={selectedStoreId === store._id}
-                          onChange={() => setSelectedStoreId(store._id)}
+                          checked={selectedStoreIds.includes(store._id)}
+                          readOnly
                           className="w-4 h-4"
                         />
-                        <span>{store.storeName || `Store ${index + 1}`}</span>
+                        <span>🏪 {store.storeName || `Store ${index + 1}`}</span>
                       </label>
                     ))}
                   </div>
