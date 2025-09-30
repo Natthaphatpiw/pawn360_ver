@@ -39,7 +39,16 @@ interface Contract {
     fullName: string;
     phone: string;
     idNumber: string;
-    address: string;
+    address: string | {
+      houseNumber: string;
+      village: string;
+      street: string;
+      subDistrict: string;
+      district: string;
+      province: string;
+      country: string;
+      postcode: string;
+    };
   };
   pawnDetails: {
     pawnedPrice: number;
@@ -53,8 +62,9 @@ interface Contract {
     brand: string;
     model: string;
     type: string;
-    serialNumber: string;
-    description: string;
+    serialNo?: string;
+    serialNumber?: string;
+    description?: string;
     condition: number;
     defects?: string;
     note?: string;
@@ -62,7 +72,8 @@ interface Contract {
     images: string[];
   };
   dates: {
-    contractDate: string;
+    startDate?: string;
+    contractDate?: string;
     dueDate: string;
     redeemDate?: string;
     suspendedDate?: string;
@@ -75,6 +86,8 @@ interface Contract {
     paymentMethod?: string;
     createdAt: string;
     note?: string;
+    beforeBalance?: number;
+    afterBalance?: number;
   }>;
   createdAt: string;
   updatedAt: string;
@@ -620,7 +633,11 @@ export default function ContractDetailPage() {
                     <label className="text-sm font-medium text-gray-600">Address</label>
                     <div className="text-gray-900 flex items-start gap-2">
                       <MapPin size={16} className="text-gray-500 mt-1 flex-shrink-0" />
-                      <span>{contract.customer.address}</span>
+                      <span>
+                        {typeof contract.customer.address === 'object'
+                          ? `${contract.customer.address.houseNumber || ''} ${contract.customer.address.village || ''} ${contract.customer.address.street || ''} ${contract.customer.address.subDistrict || ''} ${contract.customer.address.district || ''} ${contract.customer.address.province || ''} ${contract.customer.address.postcode || ''}`.trim()
+                          : contract.customer.address}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -650,7 +667,7 @@ export default function ContractDetailPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Serial Number</label>
-                    <div className="text-gray-900 font-mono">{contract.item.serialNumber}</div>
+                    <div className="text-gray-900 font-mono">{contract.item.serialNo || contract.item.serialNumber || 'N/A'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Accessories</label>
@@ -797,7 +814,7 @@ export default function ContractDetailPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-sm font-medium text-gray-600">Contract Date</label>
-                <div className="text-gray-900">{formatDate(contract.dates.contractDate)}</div>
+                <div className="text-gray-900">{formatDate(contract.dates.startDate || contract.dates.contractDate || contract.createdAt)}</div>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Due Date</label>
