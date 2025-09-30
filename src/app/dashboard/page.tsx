@@ -4,14 +4,16 @@ import React, { useState, useEffect } from 'react';
 // Make sure to adjust the import path if your FixedLayout is elsewhere
 import FixedLayout from '@/components/layout/FixedLayout';
 import CurrentItemsChart from '@/components/charts/CurrentItemsChart';
-import SuspendedItemsChart, { suspendedItemsData } from '@/components/charts/SuspendedItemsChart';
+import SuspendedItemsChart, { getSuspendedItemsData } from '@/components/charts/SuspendedItemsChart';
 import { useRouter } from 'next/navigation';
 import {
   Plus,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  X,
+  Calendar
 } from 'lucide-react';
 import { Sarabun } from 'next/font/google'
 
@@ -59,7 +61,10 @@ export default function DashboardPage() {
   const today = new Date(); // Current date (today is September 25, 2025)
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); // Current month
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [showTodayDropdown, setShowTodayDropdown] = useState(false);
+  const [showCalendarPopup, setShowCalendarPopup] = useState(false);
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [isDueSoonExpanded, setIsDueSoonExpanded] = useState(false);
   const [isOverdueExpanded, setIsOverdueExpanded] = useState(false);
   const [isSuspendedExpanded, setIsSuspendedExpanded] = useState(false);
@@ -172,8 +177,23 @@ export default function DashboardPage() {
     fetchContracts();
   }, [selectedStoreId, userStores]);
 
-  // Calculate contracts based on real data
-  const contractsDueSoon = (contracts || []).filter(contract => {
+  // Filter contracts by selected dates first
+  const filteredContracts = (contracts || []).filter(contract => {
+    // Filter by selected dates (check if contract due date matches any selected date)
+    const matchesDate = selectedDates.length === 0 || selectedDates.some(selectedDate => {
+      try {
+        const contractDueDate = new Date(contract.dates.dueDate);
+        return isSameDate(contractDueDate, selectedDate);
+      } catch (error) {
+        return false;
+      }
+    });
+
+    return matchesDate;
+  });
+
+  // Calculate contracts based on filtered data
+  const contractsDueSoon = filteredContracts.filter(contract => {
     const dueDate = new Date(contract.dates.dueDate);
     const diffTime = dueDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -185,7 +205,7 @@ export default function DashboardPage() {
     customerName: contract.customer?.fullName || 'ไม่ทราบชื่อ'
   }));
 
-  const contractsOverdue = (contracts || []).filter(contract => {
+  const contractsOverdue = filteredContracts.filter(contract => {
     const dueDate = new Date(contract.dates.dueDate);
     const diffTime = today.getTime() - dueDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -197,7 +217,7 @@ export default function DashboardPage() {
     customerName: contract.customer?.fullName || 'ไม่ทราบชื่อ'
   }));
 
-  const contractsSuspended = (contracts || []).filter(contract =>
+  const contractsSuspended = filteredContracts.filter(contract =>
     contract.status === 'suspended'
   ).map(contract => ({
     contractNo: contract.contractNumber,
@@ -206,8 +226,59 @@ export default function DashboardPage() {
     customerName: contract.customer?.fullName || 'ไม่ทราบชื่อ'
   }));
 
-  // Calculate total value
-  const totalValue = (contracts || []).reduce((sum, contract) => sum + contract.pawnDetails.pawnedPrice, 0);
+  // Calculate total value from filtered contracts
+  const totalValue = filteredContracts.reduce((sum, contract) => sum + contract.pawnDetails.pawnedPrice, 0);
+
+  // Calculate current items data for legend
+  const getCurrentItemsData = () => {
+    const activeContracts = filteredContracts.filter(contract =>
+      contract.status === 'active'
+    );
+
+    if (activeContracts.length === 0) {
+      return [
+        { name: 'No data', value: 100, color: '#e5e7eb' }
+      ];
+    }
+
+    const itemTypeCounts: { [key: string]: number } = {};
+    activeContracts.forEach(contract => {
+      const itemType = contract.item.type || 'Other';
+      itemTypeCounts[itemType] = (itemTypeCounts[itemType] || 0) + 1;
+    });
+
+    const sortedTypes = Object.entries(itemTypeCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3);
+
+    const total = activeContracts.length;
+
+    const colorMap: { [key: string]: string } = {
+      'Smartphone': '#3b82f6',
+      'Laptop': '#ef4444',
+      'Tablet': '#f97316',
+      'Phone': '#3b82f6',
+      'Gaming': '#8b5cf6',
+      'Electronics': '#06b6d4',
+      'Jewelry': '#ec4899',
+      'Watch': '#84cc16',
+      'Other': '#6b7280'
+    };
+
+    return sortedTypes.map(([type, count]) => {
+      const matchingKey = Object.keys(colorMap).find(key =>
+        type.toLowerCase().includes(key.toLowerCase())
+      );
+      return {
+        name: type,
+        value: Math.round((count / total) * 100),
+        color: matchingKey ? colorMap[matchingKey] : colorMap['Other']
+      };
+    });
+  };
+
+  const currentItemsData = getCurrentItemsData();
+  const suspendedItemsData = getSuspendedItemsData(filteredContracts);
 
   // Sorting functions
   const handleSort = (section: 'dueSoon' | 'overdue' | 'suspended', field: string) => {
@@ -294,7 +365,7 @@ export default function DashboardPage() {
   const handleQuickNavigation = (option: string) => {
     console.log('Quick navigation clicked:', option);
     let newDate = new Date(today);
-    
+
     switch (option) {
       case '7-days-before':
         newDate.setDate(today.getDate() - 7);
@@ -315,18 +386,32 @@ export default function DashboardPage() {
         newDate = new Date(today);
         break;
     }
-    
+
     console.log('Today:', today);
     console.log('New date:', newDate);
     console.log('Setting currentDate to:', new Date(newDate.getFullYear(), newDate.getMonth(), 1));
-    
+
     setSelectedDate(new Date(newDate));
+    setSelectedDates([new Date(newDate)]);
     setCurrentDate(new Date(newDate.getFullYear(), newDate.getMonth(), 1));
     setShowTodayDropdown(false);
   };
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
+    const dateKey = date.toDateString();
+    const isSelected = selectedDates.some(d => d.toDateString() === dateKey);
+
+    if (isSelected) {
+      setSelectedDates(selectedDates.filter(d => d.toDateString() !== dateKey));
+    } else {
+      setSelectedDates([...selectedDates, new Date(date)]);
+    }
+  };
+
+  const clearDateFilter = () => {
+    setSelectedDates([]);
+    setSelectedDate(null);
   };
 
   const isSameDate = (date1: Date, date2: Date) => {
@@ -341,16 +426,22 @@ export default function DashboardPage() {
       if (showTodayDropdown) {
         setShowTodayDropdown(false);
       }
+      if (showCalendarPopup) {
+        setShowCalendarPopup(false);
+      }
+      if (showStoreDropdown) {
+        setShowStoreDropdown(false);
+      }
     };
 
-    if (showTodayDropdown) {
+    if (showTodayDropdown || showCalendarPopup || showStoreDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showTodayDropdown]);
+  }, [showTodayDropdown, showCalendarPopup, showStoreDropdown]);
 
   const renderCalendar = () => {
     const year = currentDate.getFullYear();
@@ -369,14 +460,14 @@ export default function DashboardPage() {
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDateObj = new Date(year, month, day);
       const isToday = isSameDate(currentDateObj, today);
-      const isSelected = selectedDate && isSameDate(currentDateObj, selectedDate);
-      
+      const isSelected = selectedDates.some(d => isSameDate(d, currentDateObj));
+
       days.push(
         <div
           key={day}
           onClick={() => handleDateClick(currentDateObj)}
           className={`text-center p-1.5 text-xs rounded-full cursor-pointer hover:bg-gray-100 flex items-center justify-center w-6 h-6 ${
-            isToday ? 'bg-gray-800 text-white font-medium' : 
+            isToday ? 'bg-gray-800 text-white font-medium' :
             isSelected ? 'bg-blue-100 text-blue-600 font-medium' : 'text-gray-700'
           }`}
         >
@@ -408,48 +499,48 @@ export default function DashboardPage() {
     <FixedLayout>
     <div className={`flex h-full gap-1 ${prompt.className}`}>
       <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
-        {/* Store Selector */}
-        {userStores.length > 1 && (
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-gray-900">Store Selection</h3>
-                <TitleBadge text="เลือกร้าน" />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedStoreId('all')}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    selectedStoreId === 'all'
-                      ? 'bg-[#487C47] text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  All Stores ({userStores.length})
-                </button>
-                {userStores.map((store, index) => (
-                  <button
-                    key={store._id}
-                    onClick={() => setSelectedStoreId(store._id)}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      selectedStoreId === store._id
-                        ? 'bg-[#487C47] text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {store.storeName || `Store ${index + 1}`}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Top Header Section */}
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-3 flex-shrink-0">
+        {/* Top Header Section with Store Filter */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <h2 className="font-medium text-gray-800 text-[18px] ">Foreclosed item value</h2>
+            <h2 className="font-medium text-gray-800 text-[18px]">Foreclosed item value</h2>
             <TitleBadge text="มูลค่าของหลุดจำนำ" />
+          </div>
+          <div className="flex justify-end">
+            <div className="relative">
+              <button
+                onClick={() => setShowStoreDropdown(!showStoreDropdown)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                🏪 Store Filter
+                <ChevronDown size={14} />
+              </button>
+              {showStoreDropdown && (
+                <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[180px] p-2">
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedStoreId === 'all'}
+                        onChange={() => setSelectedStoreId('all')}
+                        className="w-4 h-4"
+                      />
+                      <span>All Stores ({userStores.length})</span>
+                    </label>
+                    {userStores.map((store, index) => (
+                      <label key={store._id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedStoreId === store._id}
+                          onChange={() => setSelectedStoreId(store._id)}
+                          className="w-4 h-4"
+                        />
+                        <span>{store.storeName || `Store ${index + 1}`}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         {/* Top Card Section */}
@@ -494,12 +585,18 @@ export default function DashboardPage() {
               </div>
               <div className="bg-[#ffffff] rounded-xl p-4 flex gap-4 items-center">
                 <div className="w-28 h-28 flex-shrink-0">
-                  <CurrentItemsChart />
+                  <CurrentItemsChart contracts={filteredContracts} />
                 </div>
                 <div className="space-y-2 text-xs">
-                  <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span><span>Laptop (36%)</span></div>
-                  <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 bg-blue-500 rounded-full"></span><span>Phone (50%)</span></div>
-                  <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 bg-orange-500 rounded-full"></span><span>Handheld Gaming PC (14%)</span></div>
+                  {currentItemsData.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      ></span>
+                      <span>{item.name} ({item.value}%)</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -510,13 +607,13 @@ export default function DashboardPage() {
                 </div>
                 <div className="bg-[#ffffff] rounded-xl p-4 flex gap-4 items-center">
                   <div className="w-28 h-28 flex-shrink-0">
-                    <SuspendedItemsChart />
+                    <SuspendedItemsChart contracts={filteredContracts} />
                   </div>
                   <div className="space-y-2 text-xs">
                     {suspendedItemsData.map((item, index) => (
                       <div key={index} className="flex items-center gap-2">
-                        <span 
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                           style={{ backgroundColor: item.color }}
                         ></span>
                         <span>{item.name} ({item.value}%)</span>
@@ -699,18 +796,18 @@ export default function DashboardPage() {
                   <h3 className="font-semibold text-sm">{currentDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })}</h3>
                   <div className="flex items-center gap-1">
                     <div className="relative">
-                      <button 
+                      <button
                         onClick={() => setShowTodayDropdown(!showTodayDropdown)}
                         className="px-2 py-1 bg-white border border-gray-200 rounded-md hover:bg-gray-100 text-[11px] font-medium text-gray-600"
                       >
                         today
                       </button>
                       {showTodayDropdown && (
-                        <div 
+                        <div
                           className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[140px]"
                           onMouseDown={(e) => e.preventDefault()}
                         >
-                          <button 
+                          <button
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -720,7 +817,7 @@ export default function DashboardPage() {
                           >
                             Today
                           </button>
-                          <button 
+                          <button
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -730,7 +827,7 @@ export default function DashboardPage() {
                           >
                             7 days before
                           </button>
-                          <button 
+                          <button
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -740,7 +837,7 @@ export default function DashboardPage() {
                           >
                             7 days after
                           </button>
-                          <button 
+                          <button
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -750,7 +847,7 @@ export default function DashboardPage() {
                           >
                             1 month after
                           </button>
-                          <button 
+                          <button
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -768,6 +865,35 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 {renderCalendar()}
+
+                {/* Selected dates display and clear button */}
+                {selectedDates.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-600">Date filter active:</span>
+                      <button
+                        onClick={clearDateFilter}
+                        className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"
+                      >
+                        <X size={12} />
+                        Clear
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedDates.map((date, index) => (
+                        <span
+                          key={index}
+                          className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-md"
+                        >
+                          {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500 bg-blue-50 rounded px-2 py-1">
+                      📊 Dashboard showing data for contracts due on selected dates
+                    </div>
+                  </div>
+                )}
               </div>
                 <div className="flex items-center">
                   <h3 className="text-[18px] font-medium text-gray-700">Average contract duration</h3>
