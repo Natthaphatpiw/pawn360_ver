@@ -19,6 +19,7 @@ import {
   XCircle,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   MoreHorizontal,
   X
 } from 'lucide-react';
@@ -73,6 +74,8 @@ export default function ContractsPage() {
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [showTodayDropdown, setShowTodayDropdown] = useState(false);
+  const [showCalendarPopup, setShowCalendarPopup] = useState(false);
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
   const [userStores, setUserStores] = useState<any[]>([]);
@@ -178,16 +181,22 @@ export default function ContractsPage() {
       if (showTodayDropdown) {
         setShowTodayDropdown(false);
       }
+      if (showCalendarPopup) {
+        setShowCalendarPopup(false);
+      }
+      if (showStoreDropdown) {
+        setShowStoreDropdown(false);
+      }
     };
 
-    if (showTodayDropdown) {
+    if (showTodayDropdown || showCalendarPopup || showStoreDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showTodayDropdown]);
+  }, [showTodayDropdown, showCalendarPopup, showStoreDropdown]);
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -365,42 +374,6 @@ export default function ContractsPage() {
       <div className={`flex h-full gap-1 ${sarabun.className}`}>
         {/* Left Panel - Scrollable */}
         <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
-          {/* Store Selector */}
-          {userStores.length > 1 && (
-            <div className="bg-white rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-gray-900">Store Selection</h3>
-                  <TitleBadge text="เลือกร้าน" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelectedStoreId('all')}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      selectedStoreId === 'all'
-                        ? 'bg-[#487C47] text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    All Stores ({userStores.length})
-                  </button>
-                  {userStores.map((store, index) => (
-                    <button
-                      key={store._id}
-                      onClick={() => setSelectedStoreId(store._id)}
-                      className={`px-4 py-2 rounded-lg transition-colors ${
-                        selectedStoreId === store._id
-                          ? 'bg-[#487C47] text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {store.storeName || `Store ${index + 1}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Search Section */}
           <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
@@ -601,6 +574,45 @@ export default function ContractsPage() {
 
         {/* Right Panel - Scrollable */}
         <div className="w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+          {/* Store Filter */}
+          <div className="flex justify-end">
+            <div className="relative">
+              <button
+                onClick={() => setShowStoreDropdown(!showStoreDropdown)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                🏪 Store Filter
+                <ChevronDown size={14} />
+              </button>
+              {showStoreDropdown && (
+                <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[180px] p-2">
+                  <div className="space-y-1">
+                    <label className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedStoreId === 'all'}
+                        onChange={() => setSelectedStoreId('all')}
+                        className="w-4 h-4"
+                      />
+                      <span>All Stores ({userStores.length})</span>
+                    </label>
+                    {userStores.map((store, index) => (
+                      <label key={store._id} className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedStoreId === store._id}
+                          onChange={() => setSelectedStoreId(store._id)}
+                          className="w-4 h-4"
+                        />
+                        <span>{store.storeName || `Store ${index + 1}`}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Calendar */}
           <div className="bg-white rounded-2xl p-4 border border-gray-200 flex flex-col gap-1">
             <div className="flex items-center justify-between mb-3">
