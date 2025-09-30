@@ -15,7 +15,7 @@ class Database:
     def __init__(self):
         self.client: Optional[AsyncIOMotorClient] = None
         self.database = None
-        self.database_name = "pawn360"
+        self.database_name = "pawn"
         
     async def connect_to_database(self, path: str = None):
         """Create database connection"""

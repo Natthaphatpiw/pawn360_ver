@@ -94,16 +94,11 @@ export default function SignUpPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Store token and user data
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        if (data.store) {
-          localStorage.setItem('store', JSON.stringify(data.store));
-        }
-        
-        // Redirect to dashboard
-        router.push('/dashboard');
+        // Show success message and redirect to login
+        alert('Account created successfully! Please login with your credentials.');
+
+        // Redirect to login page
+        router.push('/auth/login');
       } else {
         setError(data.detail || data.message || 'Signup failed');
       }

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import FixedLayout from '@/components/layout/FixedLayout';
-import { contractsData, Contract, updateContract } from '@/data/contracts';
 import { Sarabun } from 'next/font/google';
 const sarabun = Sarabun({
   subsets: ['latin','thai'],
@@ -31,6 +30,55 @@ import {
   Eye,
   X
 } from 'lucide-react';
+
+interface Contract {
+  _id: string;
+  contractNumber: string;
+  customerId: string;
+  customer: {
+    fullName: string;
+    phone: string;
+    idNumber: string;
+    address: string;
+  };
+  pawnDetails: {
+    pawnedPrice: number;
+    interestRate: number;
+    totalInterest: number;
+    remainingAmount: number;
+    aiEstimatedPrice: number;
+    periodDays: number;
+  };
+  item: {
+    brand: string;
+    model: string;
+    type: string;
+    serialNumber: string;
+    description: string;
+    condition: number;
+    defects?: string;
+    note?: string;
+    accessories?: string;
+    images: string[];
+  };
+  dates: {
+    contractDate: string;
+    dueDate: string;
+    redeemDate?: string;
+    suspendedDate?: string;
+  };
+  status: string;
+  transactionHistory: Array<{
+    _id: string;
+    type: string;
+    amount: number;
+    paymentMethod?: string;
+    createdAt: string;
+    note?: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
 
 
 interface ModalProps {
@@ -67,14 +115,33 @@ export default function ContractDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [contract, setContract] = useState<Contract | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [modalData, setModalData] = useState<any>({});
 
   useEffect(() => {
-    // Find contract by ID from the shared contracts data
-    const contractId = Array.isArray(params.id) ? params.id[0] : params.id;
-    const foundContract = contractsData.find(contract => String(contract.id) === String(contractId));
-    setContract(foundContract || null);
+    const fetchContract = async () => {
+      try {
+        setLoading(true);
+        const contractId = Array.isArray(params.id) ? params.id[0] : params.id;
+
+        const response = await fetch(`/api/contracts/${contractId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch contract');
+        }
+
+        const data = await response.json();
+        setContract(data);
+      } catch (err) {
+        console.error('Error fetching contract:', err);
+        setError('Failed to load contract');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContract();
   }, [params.id]);
 
   const TitleBadge = ({ text }: { text: string }) => (
@@ -83,13 +150,31 @@ export default function ContractDetailPage() {
     </div>
   );
 
-  if (!contract) {
+  if (loading) {
     return (
       <FixedLayout>
         <div className={`flex items-center justify-center h-64 ${sarabun.className}`}>
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#487C47] mx-auto mb-4"></div>
-            <p className="text-gray-500">Contract not found or loading...</p>
+            <p className="text-gray-500">Loading contract...</p>
+          </div>
+        </div>
+      </FixedLayout>
+    );
+  }
+
+  if (error || !contract) {
+    return (
+      <FixedLayout>
+        <div className={`flex items-center justify-center h-64 ${sarabun.className}`}>
+          <div className="text-center">
+            <p className="text-red-500 mb-4">{error || 'Contract not found'}</p>
+            <button
+              onClick={() => router.back()}
+              className="px-4 py-2 bg-[#487C47] text-white rounded-lg hover:bg-[#386337]"
+            >
+              Go Back
+            </button>
           </div>
         </div>
       </FixedLayout>
@@ -146,59 +231,49 @@ export default function ContractDetailPage() {
     setModalData({});
   };
 
-  const handleModalSubmit = () => {
+  const handleModalSubmit = async () => {
     if (!contract) return;
 
-    console.log('=== BEFORE TRANSACTION ===');
-    console.log('Current transactions count:', contract.transactionHistory.length);
-    console.log('Modal data:', modalData);
-    console.log('Active modal:', activeModal);
+    try {
+      // Prepare action data
+      const actionData = {
+        type: activeModal,
+        amount: modalData.amount ? parseInt(modalData.amount) : (activeModal === 'redeem' ? calculateTotal() : calculateInterest()),
+        paymentMethod: modalData.paymentMethod,
+        note: modalData.note,
+        reason: modalData.reason,
+        processedBy: '68db577210012d2296d0579f', // Mock user ID - in real app, get from auth context
+        extensionDays: modalData.extensionDays || 30
+      };
 
-    // Create new transaction record
-    const newTransaction = {
-      id: Date.now().toString(),
-      type: activeModal as 'interest_payment' | 'principal_increase' | 'principal_decrease' | 'redeem' | 'suspend',
-      amount: modalData.amount ? parseInt(modalData.amount) : (activeModal === 'redeem' ? calculateTotal() : calculateInterest()),
-      paymentMethod: modalData.paymentMethod,
-      date: new Date().toISOString().split('T')[0],
-      note: modalData.note
-    };
+      // Call the API to process the action
+      const response = await fetch(`/api/contracts/${contract._id}/actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(actionData),
+      });
 
-    console.log('New transaction:', newTransaction);
+      if (!response.ok) {
+        throw new Error('Failed to process action');
+      }
 
-    // Update contract with new transaction and status
-    const updatedContract = {
-      ...contract,
-      transactionHistory: [...contract.transactionHistory, newTransaction]
-    };
+      // Refresh the contract data
+      const contractResponse = await fetch(`/api/contracts/${contract._id}`);
+      if (!contractResponse.ok) {
+        throw new Error('Failed to refresh contract data');
+      }
 
-    // Update status based on action
-    if (activeModal === 'redeem') {
-      updatedContract.status = 'redeemed' as const;
-    } else if (activeModal === 'suspend') {
-      updatedContract.status = 'suspended' as const;
+      const updatedContract = await contractResponse.json();
+      setContract(updatedContract);
+
+      setActiveModal(null);
+      setModalData({});
+    } catch (err) {
+      console.error('Error processing action:', err);
+      setError('Failed to process action');
     }
-
-    // Update principal amount for increase/decrease actions
-    if (activeModal === 'increase_loan' && modalData.amount) {
-      updatedContract.pawnDetails.pawnedPrice += parseInt(modalData.amount);
-    } else if (activeModal === 'decrease_loan' && modalData.amount) {
-      updatedContract.pawnDetails.pawnedPrice = Math.max(0, updatedContract.pawnDetails.pawnedPrice - parseInt(modalData.amount));
-    }
-
-    // Update the local state
-    setContract(updatedContract);
-
-    // Update the shared contracts data
-    updateContract(contract.id, updatedContract);
-
-    console.log('=== AFTER TRANSACTION ===');
-    console.log('Updated transactions count:', updatedContract.transactionHistory.length);
-    console.log('Updated contract status:', updatedContract.status);
-    console.log('Updated principal:', updatedContract.pawnDetails.pawnedPrice);
-
-    setActiveModal(null);
-    setModalData({});
   };
 
   const renderActionModal = () => {
@@ -526,7 +601,7 @@ export default function ContractDetailPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium text-gray-600">Full Name</label>
-                    <div className="text-gray-900 font-medium">{contract.customer.name}</div>
+                    <div className="text-gray-900 font-medium">{contract.customer.fullName}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Phone Number</label>
@@ -575,7 +650,7 @@ export default function ContractDetailPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Serial Number</label>
-                    <div className="text-gray-900 font-mono">{contract.item.serialNo}</div>
+                    <div className="text-gray-900 font-mono">{contract.item.serialNumber}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Accessories</label>
@@ -637,9 +712,9 @@ export default function ContractDetailPage() {
               {contract.transactionHistory.length > 0 ? (
                 <div className="space-y-3">
                   {contract.transactionHistory
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                     .map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div key={transaction._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-[#487C47] rounded-full flex items-center justify-center">
                           <DollarSign size={16} className="text-white" />
@@ -649,7 +724,7 @@ export default function ContractDetailPage() {
                             {transaction.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {formatDate(transaction.date)} • {transaction.paymentMethod}
+                            {formatDate(transaction.createdAt)} • {transaction.paymentMethod || 'N/A'}
                           </div>
                         </div>
                       </div>
@@ -721,8 +796,8 @@ export default function ContractDetailPage() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-gray-600">Start Date</label>
-                <div className="text-gray-900">{formatDate(contract.dates.startDate)}</div>
+                <label className="text-sm font-medium text-gray-600">Contract Date</label>
+                <div className="text-gray-900">{formatDate(contract.dates.contractDate)}</div>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Due Date</label>
