@@ -6,7 +6,7 @@ import FixedLayout from '@/components/layout/FixedLayout';
 import CurrentItemsChart from '@/components/charts/CurrentItemsChart';
 import SuspendedItemsChart, { suspendedItemsData } from '@/components/charts/SuspendedItemsChart';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -20,6 +20,40 @@ const prompt = Sarabun({
   weight: ['400', '500', '600', '700'] // แนะนำให้ import หลายน้ำหนัก
 })
 
+interface Contract {
+  _id: string;
+  contractNumber: string;
+  customerId: string;
+  customer: {
+    fullName: string;
+    phone: string;
+    idNumber: string;
+  };
+  pawnDetails: {
+    pawnedPrice: number;
+    interestRate: number;
+    totalInterest: number;
+    remainingAmount: number;
+  };
+  item: {
+    brand: string;
+    model: string;
+    type: string;
+    serialNumber: string;
+    description: string;
+    images: string[];
+  };
+  dates: {
+    contractDate: string;
+    dueDate: string;
+    redeemDate?: string;
+    suspendedDate?: string;
+  };
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const today = new Date(); // Current date (today is September 25, 2025)
@@ -30,100 +64,150 @@ export default function DashboardPage() {
   const [isOverdueExpanded, setIsOverdueExpanded] = useState(false);
   const [isSuspendedExpanded, setIsSuspendedExpanded] = useState(false);
 
+  // Real data states
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userStores, setUserStores] = useState<any[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+
   // Sorting states
   const [dueSoonSort, setDueSoonSort] = useState({ field: '', order: 'default' });
   const [overdueSort, setOverdueSort] = useState({ field: '', order: 'default' });
   const [suspendedSort, setSuspendedSort] = useState({ field: '', order: 'default' });
 
-  // Mock data for contracts due soon
-  const contractsDueSoon = [
-    {
-      contractNo: 'C2025-001',
-      value: 15000,
-      dueDate: '2025-09-26',
-      customerName: 'นายสมชาย ใจดี'
-    },
-    {
-      contractNo: 'C2025-002', 
-      value: 8500,
-      dueDate: '2025-09-25',
-      customerName: 'นางสาวมาลัย รักดี'
-    },
-    {
-      contractNo: 'C2025-003',
-      value: 22000,
-      dueDate: '2025-09-27',
-      customerName: 'นายประเสริฐ มั่งมี'
-    }
-  ];
+  // Fetch user stores and contracts
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
 
-  // Mock data for overdue contracts
-  const contractsOverdue = [
-    {
-      contractNo: 'C2025-004',
-      value: 12000,
-      dueDate: '2025-09-18',
-      customerName: 'นายวิชัย เก่งกาจ'
-    },
-    {
-      contractNo: 'C2025-005',
-      value: 25000,
-      dueDate: '2025-09-16',
-      customerName: 'นางสาวสุดา ขยันดี'
-    },
-    {
-      contractNo: 'C2025-006',
-      value: 18500,
-      dueDate: '2025-09-19',
-      customerName: 'นายอานนท์ มีเงิน'
-    },
-    {
-      contractNo: 'C2025-007',
-      value: 9800,
-      dueDate: '2025-09-17',
-      customerName: 'นางจิราพร สวยงาม'
-    },
-    {
-      contractNo: 'C2025-008',
-      value: 7200,
-      dueDate: '2025-09-20',
-      customerName: 'นายสมบัติ รำ่รวย'
-    },
-    {
-      contractNo: 'C2025-009',
-      value: 16300,
-      dueDate: '2025-09-15',
-      customerName: 'นางสาวปิยะดา นุ่มนิ่ม'
-    },
-    {
-      contractNo: 'C2025-010',
-      value: 11200,
-      dueDate: '2025-09-21',
-      customerName: 'นายธนากร โชคดี'
-    }
-  ];
+        // Get user from localStorage
+        const userStr = localStorage.getItem('user');
+        const token = localStorage.getItem('access_token');
 
-  // Mock data for suspended contracts
-  const contractsSuspended = [
-    {
-      contractNo: 'C2025-011',
-      value: 30000,
-      dueDate: '2025-08-15',
-      customerName: 'นายสุรชัย ล้มละลาย'
-    },
-    {
-      contractNo: 'C2025-012',
-      value: 45000,
-      dueDate: '2025-08-10',
-      customerName: 'นางสาวพิมพ์ใจ หนี้สิน'
-    },
-    {
-      contractNo: 'C2025-013',
-      value: 28500,
-      dueDate: '2025-08-22',
-      customerName: 'นายบุญชัย หายไป'
-    }
-  ];
+        if (!userStr || !token) {
+          router.push('/auth/login');
+          return;
+        }
+
+        // Fetch user's stores
+        const storesResponse = await fetch('http://127.0.0.1:8000/stores', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (storesResponse.ok) {
+          const userStoresList = await storesResponse.json();
+          setUserStores(userStoresList);
+
+          // Set first store as default if no selection
+          if (userStoresList.length > 0 && selectedStoreId === 'all') {
+            setSelectedStoreId('all');
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError('Failed to load user data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  // Fetch contracts when store selection changes
+  useEffect(() => {
+    const fetchContracts = async () => {
+      if (userStores.length === 0) return;
+
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+
+        let allContracts: Contract[] = [];
+
+        if (selectedStoreId === 'all') {
+          // Fetch contracts from all user's stores
+          for (const store of userStores) {
+            const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${store._id}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (response.ok) {
+              const storeContracts = await response.json();
+              allContracts = [...allContracts, ...storeContracts];
+            }
+          }
+        } else {
+          // Fetch contracts from selected store only
+          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${selectedStoreId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            allContracts = await response.json();
+          }
+        }
+
+        setContracts(allContracts);
+      } catch (err) {
+        console.error('Error fetching contracts:', err);
+        setError('Failed to load contracts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContracts();
+  }, [selectedStoreId, userStores]);
+
+  // Calculate contracts based on real data
+  const contractsDueSoon = (contracts || []).filter(contract => {
+    const dueDate = new Date(contract.dates.dueDate);
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 3 && contract.status === 'active';
+  }).map(contract => ({
+    contractNo: contract.contractNumber,
+    value: contract.pawnDetails.pawnedPrice,
+    dueDate: contract.dates.dueDate,
+    customerName: contract.customer?.fullName || 'ไม่ทราบชื่อ'
+  }));
+
+  const contractsOverdue = (contracts || []).filter(contract => {
+    const dueDate = new Date(contract.dates.dueDate);
+    const diffTime = today.getTime() - dueDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 && diffDays <= 7 && contract.status === 'overdue';
+  }).map(contract => ({
+    contractNo: contract.contractNumber,
+    value: contract.pawnDetails.pawnedPrice,
+    dueDate: contract.dates.dueDate,
+    customerName: contract.customer?.fullName || 'ไม่ทราบชื่อ'
+  }));
+
+  const contractsSuspended = (contracts || []).filter(contract =>
+    contract.status === 'suspended'
+  ).map(contract => ({
+    contractNo: contract.contractNumber,
+    value: contract.pawnDetails.pawnedPrice,
+    dueDate: contract.dates.dueDate,
+    customerName: contract.customer?.fullName || 'ไม่ทราบชื่อ'
+  }));
+
+  // Calculate total value
+  const totalValue = (contracts || []).reduce((sum, contract) => sum + contract.pawnDetails.pawnedPrice, 0);
 
   // Sorting functions
   const handleSort = (section: 'dueSoon' | 'overdue' | 'suspended', field: string) => {
@@ -324,6 +408,43 @@ export default function DashboardPage() {
     <FixedLayout>
     <div className={`flex h-full gap-1 ${prompt.className}`}>
       <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        {/* Store Selector */}
+        {userStores.length > 1 && (
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">Store Selection</h3>
+                <TitleBadge text="เลือกร้าน" />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedStoreId('all')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    selectedStoreId === 'all'
+                      ? 'bg-[#487C47] text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  All Stores ({userStores.length})
+                </button>
+                {userStores.map((store, index) => (
+                  <button
+                    key={store._id}
+                    onClick={() => setSelectedStoreId(store._id)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      selectedStoreId === store._id
+                        ? 'bg-[#487C47] text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {store.storeName || `Store ${index + 1}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Top Header Section */}
         <div className="grid grid-cols-1 md:grid-cols-1 gap-3 flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -352,7 +473,7 @@ export default function DashboardPage() {
             </div>
             <div className="text-right">
               <p className="text-xs text-gray-500">THB</p>
-              <p className="text-2xl font-medium text-gray-800">7,000.00</p>
+              <p className="text-2xl font-medium text-gray-800">0.00</p>
             </div>
           </div>
         </div>
@@ -569,7 +690,7 @@ export default function DashboardPage() {
           </div>
           <div className="text-right">
             <p className="text-xs opacity-80">THB</p>
-            <p className="text-2xl text-right flex justify-end">77,300.00</p>
+            <p className="text-2xl text-right flex justify-end">{totalValue.toLocaleString()}.00</p>
           </div>
         </div>
           <div className="flex flex-col gap-3">

@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import FixedLayout from '@/components/layout/FixedLayout';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { contractsData, Contract } from '@/data/contracts';
 import {
   Search,
   Eye,
@@ -29,16 +28,150 @@ const sarabun = Sarabun({
   weight: ['400', '500', '600', '700'],
 });
 
+interface Contract {
+  _id: string;
+  contractNumber: string;
+  customerId: string;
+  customer: {
+    fullName: string;
+    phone: string;
+    idNumber: string;
+  };
+  pawnDetails: {
+    pawnedPrice: number;
+    interestRate: number;
+    totalInterest: number;
+    remainingAmount: number;
+  };
+  item: {
+    brand: string;
+    model: string;
+    type: string;
+    serialNumber: string;
+    description: string;
+    images: string[];
+  };
+  dates: {
+    contractDate: string;
+    dueDate: string;
+    redeemDate?: string;
+    suspendedDate?: string;
+  };
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export default function ContractsPage() {
   const router = useRouter();
-  const [contracts, setContracts] = useState<Contract[]>(contractsData);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [showTodayDropdown, setShowTodayDropdown] = useState(false);
+  const [stores, setStores] = useState<any[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+  const [userStores, setUserStores] = useState<any[]>([]);
+
+  // Fetch user stores and contracts
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
+
+        // Get user from localStorage
+        const userStr = localStorage.getItem('user');
+        const token = localStorage.getItem('access_token');
+
+        if (!userStr || !token) {
+          router.push('/auth/login');
+          return;
+        }
+
+        // Fetch user's stores
+        const storesResponse = await fetch('http://127.0.0.1:8000/stores', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (storesResponse.ok) {
+          const userStoresList = await storesResponse.json();
+          setUserStores(userStoresList);
+
+          // Set first store as default if no selection
+          if (userStoresList.length > 0 && selectedStoreId === 'all') {
+            setSelectedStoreId(userStoresList[0]._id);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError('Failed to load user data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  // Fetch contracts when store selection changes
+  useEffect(() => {
+    const fetchContracts = async () => {
+      if (userStores.length === 0) return;
+
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+
+        let allContracts: Contract[] = [];
+
+        if (selectedStoreId === 'all') {
+          // Fetch contracts from all user's stores
+          for (const store of userStores) {
+            const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${store._id}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (response.ok) {
+              const storeContracts = await response.json();
+              allContracts = [...allContracts, ...storeContracts];
+            }
+          }
+        } else {
+          // Fetch contracts from selected store only
+          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${selectedStoreId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            allContracts = await response.json();
+          }
+        }
+
+        setContracts(allContracts);
+      } catch (err) {
+        console.error('Error fetching contracts:', err);
+        setError('Failed to load contracts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContracts();
+  }, [selectedStoreId, userStores]);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -204,7 +337,7 @@ export default function ContractsPage() {
 
   const filteredContracts = contracts.filter(contract => {
     const matchesSearch = contract.contractNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         contract.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         contract.customer.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          contract.item.model.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === '' || contract.status === statusFilter;
 
@@ -232,6 +365,43 @@ export default function ContractsPage() {
       <div className={`flex h-full gap-1 ${sarabun.className}`}>
         {/* Left Panel - Scrollable */}
         <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+          {/* Store Selector */}
+          {userStores.length > 1 && (
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900">Store Selection</h3>
+                  <TitleBadge text="เลือกร้าน" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedStoreId('all')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      selectedStoreId === 'all'
+                        ? 'bg-[#487C47] text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    All Stores ({userStores.length})
+                  </button>
+                  {userStores.map((store, index) => (
+                    <button
+                      key={store._id}
+                      onClick={() => setSelectedStoreId(store._id)}
+                      className={`px-4 py-2 rounded-lg transition-colors ${
+                        selectedStoreId === store._id
+                          ? 'bg-[#487C47] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {store.storeName || `Store ${index + 1}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Search Section */}
           <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
             <div className="flex items-center gap-1 mb-1">
@@ -252,7 +422,65 @@ export default function ContractsPage() {
                     placeholder="Search contract..."
                     className="flex-1 px-[9rem] py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
-                  <button className="px-6 py-3 bg-[#487C47] text-white rounded-lg hover:bg-[#386337] transition-colors">
+                  <button
+                    onClick={async () => {
+                      if (!searchQuery.trim()) return;
+
+                      setLoading(true);
+                      try {
+                        const token = localStorage.getItem('access_token');
+                        if (!token) return;
+
+                        let searchResults: Contract[] = [];
+
+                        if (selectedStoreId === 'all') {
+                          // Search across all user's stores
+                          for (const store of userStores) {
+                            const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${store._id}`, {
+                              headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                              }
+                            });
+
+                            if (response.ok) {
+                              const storeContracts = await response.json();
+                              // Filter contracts by search query
+                              const filtered = storeContracts.filter((contract: Contract) =>
+                                contract.contractNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                contract.customer?.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+                              );
+                              searchResults = [...searchResults, ...filtered];
+                            }
+                          }
+                        } else {
+                          // Search in selected store only
+                          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${selectedStoreId}`, {
+                            headers: {
+                              'Authorization': `Bearer ${token}`,
+                              'Content-Type': 'application/json'
+                            }
+                          });
+
+                          if (response.ok) {
+                            const storeContracts = await response.json();
+                            searchResults = storeContracts.filter((contract: Contract) =>
+                              contract.contractNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              contract.customer?.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+                            );
+                          }
+                        }
+
+                        setContracts(searchResults);
+                      } catch (err) {
+                        console.error('Search error:', err);
+                        setError('Search failed');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="px-6 py-3 bg-[#487C47] text-white rounded-lg hover:bg-[#386337] transition-colors"
+                  >
                     Search
                   </button>
                 </div>
@@ -308,42 +536,62 @@ export default function ContractsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredContracts.map((contract, index) => (
-                      <tr
-                        key={contract.id}
-                        className={`border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                        onClick={() => router.push(`/contracts/${contract.id}`)}
-                      >
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-gray-900 text-sm">{contract.contractNumber}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="text-gray-900 text-sm">{contract.item.model}</div>
-                          <div className="text-gray-500 text-xs">{contract.item.brand} • {contract.item.type}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="text-gray-900 text-sm font-medium">{formatCurrency(contract.pawnDetails.pawnedPrice)} THB</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          {getStatusBadge(contract.status)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="text-gray-900 text-sm">{contract.dates.dueDate}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/contracts/${contract.id}`);
-                            }}
-                            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                            title="View contract details"
-                          >
-                            <Eye size={16} className="text-gray-500" />
-                          </button>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-gray-500">
+                          Loading contracts...
                         </td>
                       </tr>
-                    ))}
+                    ) : error ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-red-500">
+                          {error}
+                        </td>
+                      </tr>
+                    ) : filteredContracts.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-gray-500">
+                          No contracts found
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredContracts.map((contract, index) => (
+                        <tr
+                          key={contract._id}
+                          className={`border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                          onClick={() => router.push(`/contracts/${contract._id}`)}
+                        >
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-gray-900 text-sm">{contract.contractNumber}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-gray-900 text-sm">{contract.item.model}</div>
+                            <div className="text-gray-500 text-xs">{contract.item.brand} • {contract.item.type}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-gray-900 text-sm font-medium">{formatCurrency(contract.pawnDetails.pawnedPrice)} THB</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            {getStatusBadge(contract.status)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-gray-900 text-sm">{new Date(contract.dates.dueDate).toLocaleDateString()}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/contracts/${contract._id}`);
+                              }}
+                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                              title="View contract details"
+                            >
+                              <Eye size={16} className="text-gray-500" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
