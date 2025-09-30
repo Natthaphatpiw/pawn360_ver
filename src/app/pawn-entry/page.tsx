@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { 
   Plus,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search,
+  X
 } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
 const sarabun = Sarabun({
@@ -14,14 +16,33 @@ const sarabun = Sarabun({
   weight: ['400', '500', '600', '700'],
 });
 
+interface Customer {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  phone: string;
+  idNumber: string;
+  address: any;
+}
+
 export default function PawnEntryPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'register' | 'contracts'>('contracts');
   const [searchId, setSearchId] = useState('');
-  const today = new Date(); // Current date (today is September 25, 2025)
-  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); // Current month
+  const [searchPhone, setSearchPhone] = useState('');
+  const [searchName, setSearchName] = useState('');
+  const [searchResults, setSearchResults] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const today = new Date();
+  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showTodayDropdown, setShowTodayDropdown] = useState(false);
   const [showContractPreview, setShowContractPreview] = useState(false);
+  const [userStores, setUserStores] = useState<any[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+  const [user, setUser] = useState<any>(null);
 
   // Customer data state
   const [customerData, setCustomerData] = useState({
@@ -52,6 +73,13 @@ export default function PawnEntryPage() {
     note: ''
   });
 
+  // Pawn details state
+  const [pawnDetails, setPawnDetails] = useState({
+    aiEstimatedPrice: 100000,
+    pawnedPrice: '',
+    periodDays: ''
+  });
+
   // States for dropdowns
   const [brands, setBrands] = useState(['Apple', 'Samsung', 'Dell', 'HP', 'Lenovo', 'ASUS', 'MSI', 'Acer']);
   const [models, setModels] = useState(['iPhone 15', 'MacBook Pro', 'Galaxy S24', 'ThinkPad X1', 'ROG Strix']);
@@ -59,20 +87,105 @@ export default function PawnEntryPage() {
 
   // States for add new items
   const [showAddBrand, setShowAddBrand] = useState(false);
-  const [isDueSoonExpanded, setIsDueSoonExpanded] = useState(false);
-  const [isOverdueExpanded, setIsOverdueExpanded] = useState(false);
-  const [isSuspendedExpanded, setIsSuspendedExpanded] = useState(false);
-
-  // Sorting states
-  const [dueSoonSort, setDueSoonSort] = useState({ field: '', order: 'default' });
-  const [overdueSort, setOverdueSort] = useState({ field: '', order: 'default' });
-  const [suspendedSort, setSuspendedSort] = useState({ field: '', order: 'default' });
-
   const [showAddModel, setShowAddModel] = useState(false);
   const [showAddType, setShowAddType] = useState(false);
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
   const [newType, setNewType] = useState('');
+
+  // Fetch user data and stores on mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const userStr = localStorage.getItem('user');
+      const token = localStorage.getItem('access_token');
+
+      if (!userStr || !token) {
+        router.push('/auth/login');
+        return;
+      }
+
+      const userData = JSON.parse(userStr);
+      setUser(userData);
+
+      // Fetch user's stores
+      const storesResponse = await fetch('http://127.0.0.1:8000/stores', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (storesResponse.ok) {
+        const stores = await storesResponse.json();
+        setUserStores(stores);
+        if (stores.length > 0) {
+          setSelectedStoreId(stores[0]._id);
+        }
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
+
+  // Search customers by phone
+  const handleSearchPhone = async (phone: string) => {
+    setSearchPhone(phone);
+    if (phone.length >= 3) {
+      await searchCustomers(phone, null);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
+
+  // Search customers by name
+  const handleSearchName = async (name: string) => {
+    setSearchName(name);
+    if (name.length >= 2) {
+      await searchCustomers(null, name);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
+
+  // Search customers API call
+  const searchCustomers = async (phone: string | null, name: string | null) => {
+    const token = localStorage.getItem('access_token');
+    if (!token || !selectedStoreId) return;
+
+    const params = new URLSearchParams();
+    params.append('store_id', selectedStoreId);
+    if (phone) params.append('phone', phone);
+    if (name) params.append('name', name);
+
+    const response = await fetch(`http://127.0.0.1:8000/customers/search?${params.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      const customers = await response.json();
+      setSearchResults(customers);
+      setShowSearchResults(customers.length > 0);
+    }
+  };
+
+  // Select customer from search results
+  const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setSearchPhone('');
+    setSearchName('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
+
+  // Clear selected customer
+  const handleClearCustomer = () => {
+    setSelectedCustomer(null);
+  };
 
   // Customer data handlers
   const handleCustomerDataChange = (field: string, value: string) => {
@@ -90,8 +203,89 @@ export default function PawnEntryPage() {
     }));
   };
 
+  // Pawn details handlers
+  const handlePawnDetailsChange = (field: string, value: string) => {
+    setPawnDetails(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Register customer (Register tab)
+  const handleRegisterCustomer = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token || !selectedStoreId) return;
+
+    const customerPayload = {
+      title: customerData.title,
+      firstName: customerData.firstName,
+      lastName: customerData.lastName,
+      fullName: `${getTitleText()} ${customerData.firstName} ${customerData.lastName}`.trim(),
+      phone: customerData.phoneNumber,
+      idNumber: customerData.idNumber,
+      address: {
+        houseNumber: customerData.address,
+        village: customerData.village,
+        street: customerData.street,
+        subDistrict: customerData.subDistrict,
+        district: customerData.district,
+        province: customerData.province,
+        country: customerData.country,
+        postcode: customerData.postcode
+      },
+      storeId: selectedStoreId
+    };
+
+    const response = await fetch('http://127.0.0.1:8000/customers', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(customerPayload)
+    });
+
+    if (response.ok) {
+      alert('ลงทะเบียนลูกค้าสำเร็จ!');
+      // Reset form
+      setCustomerData({
+        title: '',
+        firstName: '',
+        lastName: '',
+        phoneNumber: '',
+        idNumber: '',
+        address: '',
+        village: '',
+        street: '',
+        subDistrict: '',
+        district: '',
+        province: '',
+        country: 'ประเทศไทย',
+        postcode: ''
+      });
+    } else {
+      alert('เกิดข้อผิดพลาดในการลงทะเบียนลูกค้า');
+    }
+  };
+
   // Contract preview functions
   const handleShowContractPreview = () => {
+    // Validate required fields
+    if (activeTab === 'contracts' && !selectedCustomer) {
+      alert('กรุณาเลือกลูกค้าก่อน');
+      return;
+    }
+    
+    if (!itemData.brand || !itemData.model || !itemData.type) {
+      alert('กรุณากรอกข้อมูลสินค้าให้ครบถ้วน');
+      return;
+    }
+
+    if (!pawnDetails.pawnedPrice || !pawnDetails.periodDays) {
+      alert('กรุณากรอกรายละเอียดการจำนำให้ครบถ้วน');
+      return;
+    }
+
     setShowContractPreview(true);
   };
 
@@ -99,22 +293,125 @@ export default function PawnEntryPage() {
     setShowContractPreview(false);
   };
 
-  const handleCreateContract = () => {
-    // TODO: Implement contract creation logic
-    console.log('Creating contract with data:', { customerData, itemData });
-    // For now, just close the modal and redirect
-    setShowContractPreview(false);
-    router.push('/contracts');
+  const handleCreateContract = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token || !selectedStoreId) return;
+
+    let customerId = selectedCustomer?._id;
+
+    // If in Register tab and no customer selected, create customer first
+    if (activeTab === 'register' || !customerId) {
+      const customerPayload = {
+        title: customerData.title,
+        firstName: customerData.firstName,
+        lastName: customerData.lastName,
+        fullName: `${getTitleText()} ${customerData.firstName} ${customerData.lastName}`.trim(),
+        phone: customerData.phoneNumber,
+        idNumber: customerData.idNumber,
+        address: {
+          houseNumber: customerData.address,
+          village: customerData.village,
+          street: customerData.street,
+          subDistrict: customerData.subDistrict,
+          district: customerData.district,
+          province: customerData.province,
+          country: customerData.country,
+          postcode: customerData.postcode
+        },
+        storeId: selectedStoreId
+      };
+
+      const customerResponse = await fetch('http://127.0.0.1:8000/customers', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(customerPayload)
+      });
+
+      if (customerResponse.ok) {
+        const customerResult = await customerResponse.json();
+        customerId = customerResult.customer_id;
+      } else {
+        alert('เกิดข้อผิดพลาดในการสร้างข้อมูลลูกค้า');
+        return;
+      }
+    }
+
+    // Create contract
+    const contractPayload = {
+      customerId: customerId,
+      item: {
+        brand: itemData.brand,
+        model: itemData.model,
+        type: itemData.type,
+        serialNo: itemData.serialNo,
+        accessories: itemData.accessories,
+        condition: itemData.condition,
+        defects: itemData.defects,
+        note: itemData.note,
+        images: []
+      },
+      pawnDetails: {
+        aiEstimatedPrice: pawnDetails.aiEstimatedPrice,
+        pawnedPrice: parseFloat(pawnDetails.pawnedPrice),
+        interestRate: 10.0,
+        periodDays: parseInt(pawnDetails.periodDays)
+      },
+      storeId: selectedStoreId
+    };
+
+    const contractResponse = await fetch('http://127.0.0.1:8000/contracts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(contractPayload)
+    });
+
+    if (contractResponse.ok) {
+      const result = await contractResponse.json();
+      alert(`สร้างสัญญาสำเร็จ! เลขที่สัญญา: ${result.contract_number}`);
+      setShowContractPreview(false);
+      router.push('/contracts');
+    } else {
+      alert('เกิดข้อผิดพลาดในการสร้างสัญญา');
+    }
   };
 
   // Helper functions for display
+  const getTitleText = () => {
+    if (customerData.title === 'mrs') return 'นาง';
+    if (customerData.title === 'ms') return 'นางสาว';
+    return 'นาย';
+  };
+
   const getFullName = () => {
+    if (selectedCustomer) {
+      return selectedCustomer.fullName;
+    }
     const { title, firstName, lastName } = customerData;
-    const titleText = title === 'mrs' ? 'นาง' : title === 'ms' ? 'นางสาว' : 'นาย';
+    const titleText = getTitleText();
     return `${titleText} ${firstName} ${lastName}`.trim();
   };
 
   const getFullAddress = () => {
+    if (selectedCustomer) {
+      const addr = selectedCustomer.address;
+      const parts = [
+        addr.houseNumber,
+        addr.village,
+        addr.street,
+        addr.subDistrict,
+        addr.district,
+        addr.province,
+        addr.country,
+        addr.postcode
+      ].filter(Boolean);
+      return parts.join(' ');
+    }
     const { address, village, street, subDistrict, district, province, country, postcode } = customerData;
     const parts = [address, village, street, subDistrict, district, province, country, postcode].filter(Boolean);
     return parts.join(' ');
@@ -141,7 +438,6 @@ export default function PawnEntryPage() {
   };
 
   const handleQuickNavigation = (option: string) => {
-    console.log('Quick navigation clicked:', option);
     let newDate = new Date(today);
 
     switch (option) {
@@ -164,10 +460,6 @@ export default function PawnEntryPage() {
         newDate = new Date(today);
         break;
     }
-
-    console.log('Today:', today);
-    console.log('New date:', newDate);
-    console.log('Setting currentDate to:', new Date(newDate.getFullYear(), newDate.getMonth(), 1));
 
     setSelectedDate(new Date(newDate));
     setCurrentDate(new Date(newDate.getFullYear(), newDate.getMonth(), 1));
@@ -374,507 +666,613 @@ export default function PawnEntryPage() {
         <div className={`flex h-full gap-1 ${sarabun.className}`}>
         {/* Left Panel - Scrollable */}
         <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
-          {/* Search Section */}
+          {/* Tabs */}
           <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
-            <div className="flex items-center gap-1 mb-1">
-              <h2 className="text-xl font-semibold">Search</h2>
-                <TitleBadge text="ค้นหา" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 justify-between">
-                <div className="gap-[0.1rem] w-1/3">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">ID Number</label>
-                  <p className="text-gray-500 mb-1 text-[12px]">เลขบัตรประชาชน 13 หลัก</p>
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <input
-                    type="text"
-                    value={searchId}
-                    onChange={(e) => setSearchId(e.target.value)}
-                    placeholder="X-XXXX-XXXXX-XX-X"
-                    className="flex-1 px-[9rem] py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                  <button className="px-6 py-3 bg-[#487C47] text-white rounded-lg hover:bg-[#386337] transition-colors">
-                    Search
-                  </button>
-                </div>
-              </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('register')}
+                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-colors ${
+                  activeTab === 'register'
+                    ? 'bg-[#487C47] text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Register
+                <span className="text-xs ml-2">(ลงทะเบียนลูกค้า)</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('contracts')}
+                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-colors ${
+                  activeTab === 'contracts'
+                    ? 'bg-[#487C47] text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Contracts
+                <span className="text-xs ml-2">(สร้างสัญญา)</span>
+              </button>
             </div>
           </div>
 
-          {/* Registration Section */}
-          <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
-            <div className="flex items-center gap-1 mb-1">
-              <h2 className="text-xl font-semibold">Registration</h2>
-              <TitleBadge text="ลงทะเบียนลูกค้า" />
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 justify-between">
-                <div className="gap-[0.1rem] w-1/5">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">Title</label>
-                  <p className="text-gray-500 mb-1 text-[12px]">คำนำหน้าชื่อ</p>
-                </div>
-                <select
-                  className="w-4/5 px-[1rem] py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  value={customerData.title}
-                  onChange={(e) => handleCustomerDataChange('title', e.target.value)}
-                >
-                  <option value="">Mr. (นาย)</option>
-                  <option value="mrs">Mrs. (นาง)</option>
-                  <option value="ms">Ms. (นางสาว)</option>
-                </select>
+          {/* Contracts Tab - Customer Search */}
+          {activeTab === 'contracts' && (
+            <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
+              <div className="flex items-center gap-1 mb-3">
+                <h2 className="text-xl font-semibold">Search Customer</h2>
+                <TitleBadge text="ค้นหาลูกค้า" />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 justify-between">
-                  <div className="gap-[0.1rem] w-2/5">
-                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">First name</label>
-                    <p className="text-gray-500 mb-1 text-[12px]">ชื่อ</p>
+              {selectedCustomer ? (
+                <div className="bg-white rounded-lg p-4 border-2 border-green-500">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-semibold text-green-700">ลูกค้าที่เลือก</h3>
+                    <button
+                      onClick={handleClearCustomer}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <X size={20} />
+                    </button>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="ชื่อจริง"
-                    className="w-3/5 px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.firstName}
-                    onChange={(e) => handleCustomerDataChange('firstName', e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center gap-2 justify-between">
-                  <div className="gap-[0.1rem] w-2/5">
-                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">Last name</label>
-                    <p className="text-gray-500 mb-1 text-[12px]">นามสกุล</p>
+                  <div className="space-y-1 text-sm">
+                    <p><span className="font-medium">ชื่อ:</span> {selectedCustomer.fullName}</p>
+                    <p><span className="font-medium">โทร:</span> {selectedCustomer.phone}</p>
+                    <p><span className="font-medium">เลขบัตร:</span> {selectedCustomer.idNumber}</p>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="นามสกุล"
-                    className="w-3/5 px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.lastName}
-                    onChange={(e) => handleCustomerDataChange('lastName', e.target.value)}
-                  />
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 justify-between">
-                <div className="gap-[0.1rem] w-1/5">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">Phone number</label>
-                  <p className="text-gray-500 mb-1 text-[12px]">เบอร์โทรศัพท์</p>
-                </div>
-                <input
-                  type="tel"
-                  placeholder="000-000-0000"
-                  className="w-4/5 px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  value={customerData.phoneNumber}
-                  onChange={(e) => handleCustomerDataChange('phoneNumber', e.target.value)}
-                />
-              </div>
-
-              <div className="flex items-center gap-2 justify-between">
-                <div className="gap-[0.1rem] w-1/5">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">ID Number</label>
-                  <p className="text-gray-500 mb-1 text-[12px]">เลขบัตรประชาชน</p>
-                </div>
-                <input
-                  type="text"
-                  placeholder="X-XXXX-XXXXX-XX-X"
-                  className="w-4/5 px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  value={customerData.idNumber}
-                  onChange={(e) => handleCustomerDataChange('idNumber', e.target.value)}
-                />
-              </div>
-              <div className="h-[1px] bg-gray-300 w-full"></div>
-
-              {/* Address Fields */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1 text-[14px]">Address (เลขที่)</label>
-                  <input
-                    type="text"
-                    placeholder="บ้านเลขที่"
-                    className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.address}
-                    onChange={(e) => handleCustomerDataChange('address', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1 text-[14px]">Village/Building (หมู่บ้าน/อาคาร)</label>
-                  <input
-                    type="text"
-                    placeholder="หมู่บ้าน/อาคาร"
-                    className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.village}
-                    onChange={(e) => handleCustomerDataChange('village', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1 text-[14px]">Street (ถนน/ซอย/ตรอก)</label>
-                  <input
-                    type="text"
-                    placeholder="ถนน/ซอย/ตรอก"
-                    className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.street}
-                    onChange={(e) => handleCustomerDataChange('street', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1 text-[14px]">Sub-district (แขวง/ตำบล)</label>
-                  <input
-                    type="text"
-                    placeholder="แขวง/ตำบล"
-                    className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.subDistrict}
-                    onChange={(e) => handleCustomerDataChange('subDistrict', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1 text-[14px]">District (เขต/อำเภอ)</label>
-                  <input
-                    type="text"
-                    placeholder="เขต/อำเภอ"
-                    className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.district}
-                    onChange={(e) => handleCustomerDataChange('district', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1 text-[14px]">Province (จังหวัด)</label>
-                  <input
-                    type="text"
-                    placeholder="จังหวัด"
-                    className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.province}
-                    onChange={(e) => handleCustomerDataChange('province', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1 text-[14px]">Country (ประเทศ)</label>
-                  <input
-                    type="text"
-                    placeholder="ประเทศ"
-                    className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.country}
-                    onChange={(e) => handleCustomerDataChange('country', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1 text-[14px]">Postcode (รหัสไปรษณีย์)</label>
-                  <input
-                    type="text"
-                    placeholder="xxxxx"
-                    className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={customerData.postcode}
-                    onChange={(e) => handleCustomerDataChange('postcode', e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Item Information */}
-          <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
-            <div className="flex items-center gap-1 mb-1">
-              <h2 className="text-xl font-semibold">Item Information</h2>
-              <TitleBadge text="ข้อมูลสินค้า" />
-            </div>
-            <div className="space-y-4">
-              <div className="flex gap-2 grid grid-cols-5">
-                <div className="gap-[0.1rem]">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">Brand</label>
-                  <p className="text-gray-500 mb-1 text-[14px]">ยี่ห้อ</p>
-                </div>
-                <div className="flex gap-2 justify-end col-span-4">
-                  <select
-                    className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                    value={itemData.brand}
-                    onChange={(e) => handleItemDataChange('brand', e.target.value)}
-                  >
-                    <option value="">เลือกยี่ห้อ</option>
-                    {brands.map((brand, index) => (
-                      <option key={index} value={brand}>{brand}</option>
-                    ))}
-                  </select>
-                  <button 
-                    onClick={() => setShowAddBrand(true)}
-                    className="px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    <Plus size={20} />
-                  </button>
-                </div>
-                
-                {/* Add Brand Modal */}
-                {showAddBrand && (
-                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-96">
-                      <h3 className="text-lg font-semibold mb-4">เพิ่มยี่ห้อใหม่</h3>
-                      <input
-                        type="text"
-                        value={newBrand}
-                        onChange={(e) => setNewBrand(e.target.value)}
-                        placeholder="ชื่อยี่ห้อ"
-                        className="w-full px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
-                      />
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={() => setShowAddBrand(false)}
-                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                        >
-                          ยกเลิก
-                        </button>
-                        <button
-                          onClick={handleAddBrand}
-                          className="px-4 py-2 bg-[#487C47] text-white rounded-lg hover:bg-[#386337]"
-                        >
-                          เพิ่ม
-                        </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <label className="block font-medium text-gray-700 mb-1 text-sm">
+                      Search by Phone Number (ค้นหาด้วยเบอร์โทร)
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                          type="text"
+                          value={searchPhone}
+                          onChange={(e) => handleSearchPhone(e.target.value)}
+                          placeholder="กรอกเบอร์โทร..."
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="flex items-center gap-2">
-                  <div className="gap-[0.1rem] w-2/5">
-                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">Model</label>
-                    <p className="text-gray-500 mb-1 text-[14px]">รุ่น</p>
-                  </div>
-                  <div className="flex gap-2 justify-end w-3/5">
-                    <select
-                      className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                      value={itemData.model}
-                      onChange={(e) => handleItemDataChange('model', e.target.value)}
-                    >
-                      <option value="">เลือกรุ่น</option>
-                      {models.map((model, index) => (
-                        <option key={index} value={model}>{model}</option>
-                      ))}
-                    </select>
-                    <button 
-                      onClick={() => setShowAddModel(true)}
-                      className="px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      <Plus size={20} />
-                    </button>
-                  </div>
                   
-                  {/* Add Model Modal */}
-                  {showAddModel && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                      <div className="bg-white rounded-lg p-6 w-96">
-                        <h3 className="text-lg font-semibold mb-4">เพิ่มรุ่นใหม่</h3>
+                  <div className="relative">
+                    <label className="block font-medium text-gray-700 mb-1 text-sm">
+                      Search by Name (ค้นหาด้วยชื่อ)
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                         <input
                           type="text"
-                          value={newModel}
-                          onChange={(e) => setNewModel(e.target.value)}
-                          placeholder="ชื่อรุ่น"
-                          className="w-full px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
+                          value={searchName}
+                          onChange={(e) => handleSearchName(e.target.value)}
+                          placeholder="กรอกชื่อ..."
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                         />
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            onClick={() => setShowAddModel(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                          >
-                            ยกเลิก
-                          </button>
-                          <button
-                            onClick={handleAddModel}
-                            className="px-4 py-2 bg-[#487C47] text-white rounded-lg hover:bg-[#386337]"
-                          >
-                            เพิ่ม
-                          </button>
-                        </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Search Results */}
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className="bg-white rounded-lg border border-gray-300 shadow-lg max-h-60 overflow-y-auto">
+                      {searchResults.map((customer) => (
+                        <div
+                          key={customer._id}
+                          onClick={() => handleSelectCustomer(customer)}
+                          className="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                        >
+                          <p className="font-medium">{customer.fullName}</p>
+                          <p className="text-sm text-gray-600">{customer.phone}</p>
+                          <p className="text-xs text-gray-500">{customer.idNumber}</p>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Registration Section - Show for Register tab or when no customer selected in Contracts */}
+          {(activeTab === 'register' || (activeTab === 'contracts' && !selectedCustomer)) && (
+            <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
+              <div className="flex items-center gap-1 mb-1">
+                <h2 className="text-xl font-semibold">
+                  {activeTab === 'register' ? 'Registration' : 'New Customer Registration'}
+                </h2>
+                <TitleBadge text="ลงทะเบียนลูกค้า" />
+              </div>
+              <div className="space-y-4">
                 <div className="flex items-center gap-2 justify-between">
                   <div className="gap-[0.1rem] w-1/5">
-                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">Type</label>
-                    <p className="text-gray-500 mb-1 text-[14px]">ประเภท</p>
+                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">Title</label>
+                    <p className="text-gray-500 mb-1 text-[12px]">คำนำหน้าชื่อ</p>
                   </div>
-                  <div className="flex gap-2 justify-end w-4/5">
-                    <select
-                      className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                      value={itemData.type}
-                      onChange={(e) => handleItemDataChange('type', e.target.value)}
-                    >
-                      <option value="">เลือกประเภท</option>
-                      {types.map((type, index) => (
-                        <option key={index} value={type}>{type}</option>
-                      ))}
-                    </select>
-                    <button 
-                      onClick={() => setShowAddType(true)}
-                      className="px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      <Plus size={20} />
-                    </button>
+                  <select
+                    className="w-4/5 px-[1rem] py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    value={customerData.title}
+                    onChange={(e) => handleCustomerDataChange('title', e.target.value)}
+                  >
+                    <option value="">Mr. (นาย)</option>
+                    <option value="mrs">Mrs. (นาง)</option>
+                    <option value="ms">Ms. (นางสาว)</option>
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2 justify-between">
+                    <div className="gap-[0.1rem] w-2/5">
+                      <label className="block font-medium text-gray-700 mb-1 text-[16px]">First name</label>
+                      <p className="text-gray-500 mb-1 text-[12px]">ชื่อ</p>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="ชื่อจริง"
+                      className="w-3/5 px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.firstName}
+                      onChange={(e) => handleCustomerDataChange('firstName', e.target.value)}
+                    />
                   </div>
-                  
-                  {/* Add Type Modal */}
-                  {showAddType && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                      <div className="bg-white rounded-lg p-6 w-96">
-                        <h3 className="text-lg font-semibold mb-4">เพิ่มประเภทใหม่</h3>
-                        <input
-                          type="text"
-                          value={newType}
-                          onChange={(e) => setNewType(e.target.value)}
-                          placeholder="ชื่อประเภท"
-                          className="w-full px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
-                        />
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            onClick={() => setShowAddType(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                          >
-                            ยกเลิก
-                          </button>
-                          <button
-                            onClick={handleAddType}
-                            className="px-4 py-2 bg-[#487C47] text-white rounded-lg hover:bg-[#386337]"
-                          >
-                            เพิ่ม
-                          </button>
+                  <div className="flex items-center gap-2 justify-between">
+                    <div className="gap-[0.1rem] w-2/5">
+                      <label className="block font-medium text-gray-700 mb-1 text-[16px]">Last name</label>
+                      <p className="text-gray-500 mb-1 text-[12px]">นามสกุล</p>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="นามสกุล"
+                      className="w-3/5 px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.lastName}
+                      onChange={(e) => handleCustomerDataChange('lastName', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 justify-between">
+                  <div className="gap-[0.1rem] w-1/5">
+                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">Phone number</label>
+                    <p className="text-gray-500 mb-1 text-[12px]">เบอร์โทรศัพท์</p>
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="000-000-0000"
+                    className="w-4/5 px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    value={customerData.phoneNumber}
+                    onChange={(e) => handleCustomerDataChange('phoneNumber', e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 justify-between">
+                  <div className="gap-[0.1rem] w-1/5">
+                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">ID Number</label>
+                    <p className="text-gray-500 mb-1 text-[12px]">เลขบัตรประชาชน</p>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="X-XXXX-XXXXX-XX-X"
+                    className="w-4/5 px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    value={customerData.idNumber}
+                    onChange={(e) => handleCustomerDataChange('idNumber', e.target.value)}
+                  />
+                </div>
+                <div className="h-[1px] bg-gray-300 w-full"></div>
+
+                {/* Address Fields */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1 text-[14px]">Address (เลขที่)</label>
+                    <input
+                      type="text"
+                      placeholder="บ้านเลขที่"
+                      className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.address}
+                      onChange={(e) => handleCustomerDataChange('address', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1 text-[14px]">Village/Building (หมู่บ้าน/อาคาร)</label>
+                    <input
+                      type="text"
+                      placeholder="หมู่บ้าน/อาคาร"
+                      className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.village}
+                      onChange={(e) => handleCustomerDataChange('village', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1 text-[14px]">Street (ถนน/ซอย/ตรอก)</label>
+                    <input
+                      type="text"
+                      placeholder="ถนน/ซอย/ตรอก"
+                      className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.street}
+                      onChange={(e) => handleCustomerDataChange('street', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1 text-[14px]">Sub-district (แขวง/ตำบล)</label>
+                    <input
+                      type="text"
+                      placeholder="แขวง/ตำบล"
+                      className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.subDistrict}
+                      onChange={(e) => handleCustomerDataChange('subDistrict', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1 text-[14px]">District (เขต/อำเภอ)</label>
+                    <input
+                      type="text"
+                      placeholder="เขต/อำเภอ"
+                      className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.district}
+                      onChange={(e) => handleCustomerDataChange('district', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1 text-[14px]">Province (จังหวัด)</label>
+                    <input
+                      type="text"
+                      placeholder="จังหวัด"
+                      className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.province}
+                      onChange={(e) => handleCustomerDataChange('province', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1 text-[14px]">Country (ประเทศ)</label>
+                    <input
+                      type="text"
+                      placeholder="ประเทศ"
+                      className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.country}
+                      onChange={(e) => handleCustomerDataChange('country', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1 text-[14px]">Postcode (รหัสไปรษณีย์)</label>
+                    <input
+                      type="text"
+                      placeholder="xxxxx"
+                      className="w-full px-4 py-1 text-[12px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={customerData.postcode}
+                      onChange={(e) => handleCustomerDataChange('postcode', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Register Button (Only in Register tab) */}
+                {activeTab === 'register' && (
+                  <button
+                    onClick={handleRegisterCustomer}
+                    className="w-full bg-[#487C47] text-white py-3 rounded-lg hover:bg-[#386337] transition-colors font-medium"
+                  >
+                    Submit Registration
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Item Information - Show only in Contracts tab */}
+          {activeTab === 'contracts' && (
+            <>
+              <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
+                <div className="flex items-center gap-1 mb-1">
+                  <h2 className="text-xl font-semibold">Item Information</h2>
+                  <TitleBadge text="ข้อมูลสินค้า" />
+                </div>
+                <div className="space-y-4">
+                  <div className="flex gap-2 grid grid-cols-5">
+                    <div className="gap-[0.1rem]">
+                      <label className="block font-medium text-gray-700 mb-1 text-[16px]">Brand</label>
+                      <p className="text-gray-500 mb-1 text-[14px]">ยี่ห้อ</p>
+                    </div>
+                    <div className="flex gap-2 justify-end col-span-4">
+                      <select
+                        className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        value={itemData.brand}
+                        onChange={(e) => handleItemDataChange('brand', e.target.value)}
+                      >
+                        <option value="">เลือกยี่ห้อ</option>
+                        {brands.map((brand, index) => (
+                          <option key={index} value={brand}>{brand}</option>
+                        ))}
+                      </select>
+                      <button 
+                        onClick={() => setShowAddBrand(true)}
+                        className="px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        <Plus size={20} />
+                      </button>
+                    </div>
+                    
+                    {/* Add Brand Modal */}
+                    {showAddBrand && (
+                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 w-96">
+                          <h3 className="text-lg font-semibold mb-4">เพิ่มยี่ห้อใหม่</h3>
+                          <input
+                            type="text"
+                            value={newBrand}
+                            onChange={(e) => setNewBrand(e.target.value)}
+                            placeholder="ชื่อยี่ห้อ"
+                            className="w-full px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => setShowAddBrand(false)}
+                              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                            >
+                              ยกเลิก
+                            </button>
+                            <button
+                              onClick={handleAddBrand}
+                              className="px-4 py-2 bg-[#487C47] text-white rounded-lg hover:bg-[#386337]"
+                            >
+                              เพิ่ม
+                            </button>
+                          </div>
                         </div>
                       </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="flex items-center gap-2">
+                      <div className="gap-[0.1rem] w-2/5">
+                        <label className="block font-medium text-gray-700 mb-1 text-[16px]">Model</label>
+                        <p className="text-gray-500 mb-1 text-[14px]">รุ่น</p>
+                      </div>
+                      <div className="flex gap-2 justify-end w-3/5">
+                        <select
+                          className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                          value={itemData.model}
+                          onChange={(e) => handleItemDataChange('model', e.target.value)}
+                        >
+                          <option value="">เลือกรุ่น</option>
+                          {models.map((model, index) => (
+                            <option key={index} value={model}>{model}</option>
+                          ))}
+                        </select>
+                        <button 
+                          onClick={() => setShowAddModel(true)}
+                          className="px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          <Plus size={20} />
+                        </button>
+                      </div>
+                      
+                      {/* Add Model Modal */}
+                      {showAddModel && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                          <div className="bg-white rounded-lg p-6 w-96">
+                            <h3 className="text-lg font-semibold mb-4">เพิ่มรุ่นใหม่</h3>
+                            <input
+                              type="text"
+                              value={newModel}
+                              onChange={(e) => setNewModel(e.target.value)}
+                              placeholder="ชื่อรุ่น"
+                              className="w-full px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => setShowAddModel(false)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                              >
+                                ยกเลิก
+                              </button>
+                              <button
+                                onClick={handleAddModel}
+                                className="px-4 py-2 bg-[#487C47] text-white rounded-lg hover:bg-[#386337]"
+                              >
+                                เพิ่ม
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 justify-between grid grid-cols-5">
-                <div className="gap-[0.1rem]">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">Serial no.</label>
-                  <p className="text-gray-500 mb-1 text-[14px]">หมายเลขซีเรียล</p>
-                </div>
-                <div className="flex gap-2 justify-end col-span-4">
-                <input
-                  type="text"
-                  placeholder="หมายเลขซีเรียล"
-                  className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  value={itemData.serialNo}
-                  onChange={(e) => handleItemDataChange('serialNo', e.target.value)}
-                />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 justify-between grid grid-cols-5">
-                <div className="gap-[0.1rem]">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">Accessories</label>
-                  <p className="text-gray-500 mb-1 text-[14px]">อุปกรณ์เสริม</p>
-                </div>
-                <div className="flex gap-2 justify-end col-span-4">
-                <input
-                  type="text"
-                  placeholder="อุปกรณ์เสริม"
-                  className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  value={itemData.accessories}
-                  onChange={(e) => handleItemDataChange('accessories', e.target.value)}
-                />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 justify-between grid grid-cols-5">
-                <div className="gap-[0.1rem]">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">Condition</label>
-                  <p className="text-gray-500 mb-1 text-[14px]">สภาพ</p>
-                </div>
-                <div className="flex gap-2 justify-end col-span-4">
-                <div className="flex items-center gap-4 w-full">
-                  <span className="text-sm whitespace-nowrap">สภาพ</span>
-                  <div className="flex-1 flex items-center gap-3">
+                    <div className="flex items-center gap-2 justify-between">
+                      <div className="gap-[0.1rem] w-1/5">
+                        <label className="block font-medium text-gray-700 mb-1 text-[16px]">Type</label>
+                        <p className="text-gray-500 mb-1 text-[14px]">ประเภท</p>
+                      </div>
+                      <div className="flex gap-2 justify-end w-4/5">
+                        <select
+                          className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                          value={itemData.type}
+                          onChange={(e) => handleItemDataChange('type', e.target.value)}
+                        >
+                          <option value="">เลือกประเภท</option>
+                          {types.map((type, index) => (
+                            <option key={index} value={type}>{type}</option>
+                          ))}
+                        </select>
+                        <button 
+                          onClick={() => setShowAddType(true)}
+                          className="px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          <Plus size={20} />
+                        </button>
+                      </div>
+                      
+                      {/* Add Type Modal */}
+                      {showAddType && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                          <div className="bg-white rounded-lg p-6 w-96">
+                            <h3 className="text-lg font-semibold mb-4">เพิ่มประเภทใหม่</h3>
+                            <input
+                              type="text"
+                              value={newType}
+                              onChange={(e) => setNewType(e.target.value)}
+                              placeholder="ชื่อประเภท"
+                              className="w-full px-4 py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => setShowAddType(false)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                              >
+                                ยกเลิก
+                              </button>
+                              <button
+                                onClick={handleAddType}
+                                className="px-4 py-2 bg-[#487C47] text-white rounded-lg hover:bg-[#386337]"
+                              >
+                                เพิ่ม
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 justify-between grid grid-cols-5">
+                    <div className="gap-[0.1rem]">
+                      <label className="block font-medium text-gray-700 mb-1 text-[16px]">Serial no.</label>
+                      <p className="text-gray-500 mb-1 text-[14px]">หมายเลขซีเรียล</p>
+                    </div>
+                    <div className="flex gap-2 justify-end col-span-4">
                     <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={itemData.condition}
-                      onChange={(e) => handleItemDataChange('condition', e.target.value)}
-                      className="flex-1 h-2 rounded-lg appearance-none cursor-pointer slider"
-                      style={{'--slider-value': `${itemData.condition}%`} as React.CSSProperties}
+                      type="text"
+                      placeholder="หมายเลขซีเรียล"
+                      className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={itemData.serialNo}
+                      onChange={(e) => handleItemDataChange('serialNo', e.target.value)}
                     />
-                    <span className="text-sm w-10 text-center">{itemData.condition}%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 justify-between grid grid-cols-5">
+                    <div className="gap-[0.1rem]">
+                      <label className="block font-medium text-gray-700 mb-1 text-[16px]">Accessories</label>
+                      <p className="text-gray-500 mb-1 text-[14px]">อุปกรณ์เสริม</p>
+                    </div>
+                    <div className="flex gap-2 justify-end col-span-4">
+                    <input
+                      type="text"
+                      placeholder="อุปกรณ์เสริม"
+                      className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={itemData.accessories}
+                      onChange={(e) => handleItemDataChange('accessories', e.target.value)}
+                    />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 justify-between grid grid-cols-5">
+                    <div className="gap-[0.1rem]">
+                      <label className="block font-medium text-gray-700 mb-1 text-[16px]">Condition</label>
+                      <p className="text-gray-500 mb-1 text-[14px]">สภาพ</p>
+                    </div>
+                    <div className="flex gap-2 justify-end col-span-4">
+                    <div className="flex items-center gap-4 w-full">
+                      <span className="text-sm whitespace-nowrap">สภาพ</span>
+                      <div className="flex-1 flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={itemData.condition}
+                          onChange={(e) => handleItemDataChange('condition', e.target.value)}
+                          className="flex-1 h-2 rounded-lg appearance-none cursor-pointer slider"
+                          style={{'--slider-value': `${itemData.condition}%`} as React.CSSProperties}
+                        />
+                        <span className="text-sm w-10 text-center">{itemData.condition}%</span>
+                      </div>
+                    </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 justify-between grid grid-cols-5">
+                    <div className="gap-[0.1rem]">
+                      <label className="block font-medium text-gray-700 mb-1 text-[16px]">Defects</label>
+                      <p className="text-gray-500 mb-1 text-[14px]">ตำหนิ</p>
+                    </div>
+                    <div className="flex gap-2 justify-end col-span-4">
+                    <input
+                      type="text"
+                      placeholder="ตำหนิ"
+                      className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={itemData.defects}
+                      onChange={(e) => handleItemDataChange('defects', e.target.value)}
+                    />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 justify-between grid grid-cols-5">
+                    <div className="gap-[0.1rem]">
+                      <label className="block font-medium text-gray-700 mb-1 text-[16px]">Note</label>
+                      <p className="text-gray-500 mb-1 text-[14px]">หมายเหตุ</p>
+                    </div>
+                    <div className="flex gap-2 justify-end col-span-4">
+                    <textarea
+                      placeholder="หมายเหตุ"
+                      rows={3}
+                      className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={itemData.note}
+                      onChange={(e) => handleItemDataChange('note', e.target.value)}
+                    />
+                    </div>
                   </div>
                 </div>
-                </div>
               </div>
-              <div className="flex items-center gap-2 justify-between grid grid-cols-5">
-                <div className="gap-[0.1rem]">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">Defects</label>
-                  <p className="text-gray-500 mb-1 text-[14px]">ตำหนิ</p>
-                </div>
-                <div className="flex gap-2 justify-end col-span-4">
-                <input
-                  type="text"
-                  placeholder="ตำหนิ"
-                  className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  value={itemData.defects}
-                  onChange={(e) => handleItemDataChange('defects', e.target.value)}
-                />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 justify-between grid grid-cols-5">
-                <div className="gap-[0.1rem]">
-                  <label className="block font-medium text-gray-700 mb-1 text-[16px]">Note</label>
-                  <p className="text-gray-500 mb-1 text-[14px]">หมายเหตุ</p>
-                </div>
-                <div className="flex gap-2 justify-end col-span-4">
-                <textarea
-                  placeholder="หมายเหตุ"
-                  rows={3}
-                  className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  value={itemData.note}
-                  onChange={(e) => handleItemDataChange('note', e.target.value)}
-                />
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Pawn Details */}
-          <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200 space-y-4">
-            <div className="flex items-center gap-1 mb-1">
-              <h2 className="text-xl font-semibold">Pawn details</h2>
-              <TitleBadge text="รายละเอียดการจำนำ" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-green-50 rounded-2xl p-4 border border-green-200 col-span-1 flex flex-col h-full">
-                <div className="text-lg text-gray-600 mb-3 text-[18px]">AI-estimated price</div>
-                <div className="flex items-center gap-2 justify-between">
-                  <div className="text-[14px]">ราคาประเมินจาก AI (THB)</div>
-                  <div className="font-medium text-[14px] text-right">100,000 THB</div>
+              {/* Pawn Details */}
+              <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200 space-y-4">
+                <div className="flex items-center gap-1 mb-1">
+                  <h2 className="text-xl font-semibold">Pawn details</h2>
+                  <TitleBadge text="รายละเอียดการจำนำ" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-green-50 rounded-2xl p-4 border border-green-200 col-span-1 flex flex-col h-full">
+                    <div className="text-lg text-gray-600 mb-3 text-[18px]">AI-estimated price</div>
+                    <div className="flex items-center gap-2 justify-between">
+                      <div className="text-[14px]">ราคาประเมินจาก AI (THB)</div>
+                      <div className="font-medium text-[14px] text-right">{pawnDetails.aiEstimatedPrice.toLocaleString()} THB</div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 col-span-1 flex flex-col h-full">
+                    <div className="text-lg text-gray-600 mb-3 text-[18px]">Interest</div>
+                    <div className="flex items-center gap-2 justify-between">
+                      <div className="text-[14px]">ดอกเบี้ย (ต่อปี)</div>
+                      <div className="font-medium text-[14px] text-right">10%</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 justify-between grid grid-cols-5">
+                  <div className="gap-[0.1rem]">
+                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">Pawned price</label>
+                    <p className="text-gray-500 mb-1 text-[14px]">ราคาจำนำจริง(THB)</p>
+                  </div>
+                  <div className="flex gap-2 justify-end col-span-4">
+                    <input
+                      type="number"
+                      placeholder="ราคาจำนำจริง(THB)"
+                      className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={pawnDetails.pawnedPrice}
+                      onChange={(e) => handlePawnDetailsChange('pawnedPrice', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 justify-between grid grid-cols-5">
+                  <div className="gap-[0.1rem]">
+                    <label className="block font-medium text-gray-700 mb-1 text-[16px]">Period(3-365 days)</label>
+                    <p className="text-gray-500 mb-1 text-[14px]">ระยะเวลาจำนำ(3-365 วัน)</p>
+                  </div>
+                  <div className="flex gap-2 justify-end col-span-4">
+                    <input
+                      type="number"
+                      placeholder="ระยะเวลาจำนำ(3-365 วัน)"
+                      className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      value={pawnDetails.periodDays}
+                      onChange={(e) => handlePawnDetailsChange('periodDays', e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 col-span-1 flex flex-col h-full">
-                <div className="text-lg text-gray-600 mb-3 text-[18px]">Interest</div>
-                <div className="flex items-center gap-2 justify-between">
-                  <div className="text-[14px]">ดอกเบี้ย (ต่อปี)</div>
-                  <div className="font-medium text-[14px] text-right">10%</div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 justify-between grid grid-cols-5">
-              <div className="gap-[0.1rem]">
-                <label className="block font-medium text-gray-700 mb-1 text-[16px]">Pawned price</label>
-                <p className="text-gray-500 mb-1 text-[14px]">ราคาจำนำจริง(THB)</p>
-              </div>
-              <div className="flex gap-2 justify-end col-span-4">
-                <input
-                  type="text"
-                  placeholder="ราคาจำนำจริง(THB)"
-                  className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 justify-between grid grid-cols-5">
-              <div className="gap-[0.1rem]">
-                <label className="block font-medium text-gray-700 mb-1 text-[16px]">Period(3-30 days)</label>
-                <p className="text-gray-500 mb-1 text-[14px]">ระยะเวลาจำนำ(3-30 วัน)</p>
-              </div>
-              <div className="flex gap-2 justify-end col-span-4">
-                <input
-                  type="text"
-                  placeholder="ระยะเวลาจำนำ(3-30 วัน)"
-                  className="w-full px-4 py-[0.5rem] text-[14px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
         
         {/* Right Panel - Scrollable */}
@@ -972,13 +1370,13 @@ export default function PawnEntryPage() {
               <div>
                 <div className="text-sm font-medium text-gray-700">Phone number</div>
                 <div className="text-sm text-gray-500">
-                  {customerData.phoneNumber || 'Phone number'}
+                  {selectedCustomer?.phone || customerData.phoneNumber || 'Phone number'}
                 </div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-700">ID Number</div>
                 <div className="text-sm text-gray-500">
-                  {customerData.idNumber || 'เลขบัตรประชาชน'}
+                  {selectedCustomer?.idNumber || customerData.idNumber || 'เลขบัตรประชาชน'}
                 </div>
               </div>
               <div>
@@ -990,60 +1388,64 @@ export default function PawnEntryPage() {
             </div>
           </div>
 
-          {/* Item Information Summary */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold mb-4">Item information</h2>
-              <TitleBadge text="ข้อมูลของสินค้า" />
-            </div>
-            <p className="text-sm text-gray-500 mb-4">ข้อมูลของสินค้า</p>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Item</span>
-                <span className="text-sm text-gray-800">
-                  {getItemDescription() || 'ยี่ห้อ รุ่น ประเภท'}
-                </span>
+          {/* Item Information Summary - Show only in Contracts tab */}
+          {activeTab === 'contracts' && (
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold mb-4">Item information</h2>
+                <TitleBadge text="ข้อมูลของสินค้า" />
               </div>
-              {itemData.serialNo && (
+              <p className="text-sm text-gray-500 mb-4">ข้อมูลของสินค้า</p>
+              <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Serial No.</span>
-                  <span className="text-sm text-gray-800">{itemData.serialNo}</span>
+                  <span className="text-sm text-gray-600">Item</span>
+                  <span className="text-sm text-gray-800">
+                    {getItemDescription() || 'ยี่ห้อ รุ่น ประเภท'}
+                  </span>
                 </div>
-              )}
-              {itemData.accessories && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Accessories</span>
-                  <span className="text-sm text-gray-800">{itemData.accessories}</span>
-                </div>
-              )}
-              {itemData.condition !== '0' && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Condition</span>
-                  <span className="text-sm text-gray-800">{itemData.condition}%</span>
-                </div>
-              )}
-              {itemData.defects && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Defects</span>
-                  <span className="text-sm text-gray-800">{itemData.defects}</span>
-                </div>
-              )}
-              {itemData.note && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Note</span>
-                  <span className="text-sm text-gray-800">{itemData.note}</span>
-                </div>
-              )}
+                {itemData.serialNo && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Serial No.</span>
+                    <span className="text-sm text-gray-800">{itemData.serialNo}</span>
+                  </div>
+                )}
+                {itemData.accessories && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Accessories</span>
+                    <span className="text-sm text-gray-800">{itemData.accessories}</span>
+                  </div>
+                )}
+                {itemData.condition !== '0' && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Condition</span>
+                    <span className="text-sm text-gray-800">{itemData.condition}%</span>
+                  </div>
+                )}
+                {itemData.defects && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Defects</span>
+                    <span className="text-sm text-gray-800">{itemData.defects}</span>
+                  </div>
+                )}
+                {itemData.note && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Note</span>
+                    <span className="text-sm text-gray-800">{itemData.note}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action Button */}
-          <button
-            onClick={handleShowContractPreview}
-            className="w-full bg-[#386337] text-[#F5F4F2] py-3 rounded-lg hover:bg-[#0A4215] hover:text-white transition-colors font-medium"
-          >
-            <span className="text-[18px] font-medium text-[#F5F4F2]">Preview & Create</span>
-          </button>
+          {activeTab === 'contracts' && (
+            <button
+              onClick={handleShowContractPreview}
+              className="w-full bg-[#386337] text-[#F5F4F2] py-3 rounded-lg hover:bg-[#0A4215] hover:text-white transition-colors font-medium"
+            >
+              <span className="text-[18px] font-medium text-[#F5F4F2]">Preview & Create</span>
+            </button>
+          )}
         </div>
       </div>
       <ContractPreviewModal />

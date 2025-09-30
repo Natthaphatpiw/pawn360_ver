@@ -55,6 +55,8 @@ export default function AccountPage() {
   const [showCreateStoreModal, setShowCreateStoreModal] = useState(false);
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
 
   const [newStoreData, setNewStoreData] = useState<StoreData>({
     storeName: '',
@@ -132,6 +134,44 @@ export default function AccountPage() {
 
     fetchUserData();
   }, [router]);
+
+  // Fetch customers when members tab is active
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      if (activeTab !== 'members' || userStores.length === 0) return;
+
+      try {
+        setLoadingCustomers(true);
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+
+        let allCustomers: any[] = [];
+
+        // Fetch customers from all user's stores
+        for (const store of userStores) {
+          const response = await fetch(`http://127.0.0.1:8000/customers?store_id=${store._id}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const storeCustomers = await response.json();
+            allCustomers = [...allCustomers, ...storeCustomers];
+          }
+        }
+
+        setCustomers(allCustomers);
+      } catch (err) {
+        console.error('Error fetching customers:', err);
+      } finally {
+        setLoadingCustomers(false);
+      }
+    };
+
+    fetchCustomers();
+  }, [activeTab, userStores]);
 
   const handleCreateStore = async () => {
     try {
@@ -470,10 +510,101 @@ export default function AccountPage() {
             {/* Members Tab Content */}
             {activeTab === 'members' && (
               <div className={`space-y-6 ${sarabun.className}`}>
-                <div className="text-center py-12">
-                  <User size={48} className="mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500">Members management coming soon</p>
+                <div className="bg-white rounded-lg p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-2xl font-semibold text-gray-900">Customers</h2>
+                      <TitleBadge text="ลูกค้า" />
+                    </div>
+                    <button
+                      onClick={() => router.push('/pawn-entry')}
+                      className="px-4 py-2 bg-[#487C47] text-white rounded-lg hover:bg-[#386337] transition-colors flex items-center gap-2"
+                    >
+                      <Plus size={16} />
+                      Add Customer
+                    </button>
+                  </div>
+
+                  {loadingCustomers ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">Loading customers...</p>
+                    </div>
+                  ) : customers.length === 0 ? (
+                    <div className="text-center py-12">
+                      <User size={48} className="mx-auto text-gray-300 mb-4" />
+                      <p className="text-gray-500 mb-4">No customers yet</p>
+                      <button
+                        onClick={() => router.push('/pawn-entry')}
+                        className="px-6 py-3 bg-[#487C47] text-white rounded-lg hover:bg-[#386337] transition-colors flex items-center gap-2 mx-auto"
+                      >
+                        <Plus size={16} />
+                        Add Your First Customer
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">Phone</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-700">ID Number</th>
+                            <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Contracts</th>
+                            <th className="text-right py-3 px-4 font-semibold text-gray-700">Total Value</th>
+                            <th className="text-center py-3 px-4 font-semibold text-gray-700">Last Contract</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {customers.map((customer) => (
+                            <tr key={customer._id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="py-3 px-4">
+                                <div className="font-medium text-gray-900">{customer.fullName}</div>
+                              </td>
+                              <td className="py-3 px-4 text-gray-600">{customer.phone}</td>
+                              <td className="py-3 px-4 text-gray-600">{customer.idNumber}</td>
+                              <td className="py-3 px-4 text-center">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {customer.totalContracts || 0}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-medium text-gray-900">
+                                ฿{(customer.totalValue || 0).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-4 text-center text-gray-600 text-sm">
+                                {customer.lastContractDate ? 
+                                  new Date(customer.lastContractDate).toLocaleDateString('th-TH') : 
+                                  '-'
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
+
+                {/* Customer Statistics */}
+                {customers.length > 0 && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-white rounded-lg p-6 border border-gray-200">
+                      <div className="text-sm text-gray-600 mb-2">Total Customers</div>
+                      <div className="text-2xl font-bold text-gray-900">{customers.length}</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-6 border border-gray-200">
+                      <div className="text-sm text-gray-600 mb-2">Total Contracts</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {customers.reduce((sum, c) => sum + (c.totalContracts || 0), 0)}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-6 border border-gray-200">
+                      <div className="text-sm text-gray-600 mb-2">Total Value</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        ฿{customers.reduce((sum, c) => sum + (c.totalValue || 0), 0).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

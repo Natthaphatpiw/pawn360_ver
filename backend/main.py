@@ -359,36 +359,79 @@ async def update_store(store_id: str, store_data: StoreCreate, user_id: str = De
 # Customer endpoints
 @app.get("/customers")
 async def get_customers(store_id: str, user_id: str = Depends(verify_token)):
-    customers = await database.customers.find({"store_id": ObjectId(store_id)}).to_list(100)
+    customers = await database.customers.find({"storeId": ObjectId(store_id)}).to_list(100)
     for customer in customers:
         customer["_id"] = str(customer["_id"])
-        customer["store_id"] = str(customer["store_id"])
+        if "storeId" in customer:
+            customer["storeId"] = str(customer["storeId"])
+        if "createdBy" in customer:
+            customer["createdBy"] = str(customer["createdBy"])
+        # Ensure contractsID is array
+        if "contractsID" not in customer:
+            customer["contractsID"] = []
+        else:
+            # Convert ObjectIds to strings
+            customer["contractsID"] = [str(cid) for cid in customer["contractsID"]]
     return customers
 
 @app.post("/customers")
-async def create_customer(customer_data: CustomerCreate, user_id: str = Depends(verify_token)):
+async def create_customer(customer_data: Dict[str, Any], user_id: str = Depends(verify_token)):
+    # Create customer document
     customer_doc = {
-        **customer_data.dict(),
-        "store_id": ObjectId(customer_data.store_id),
-        "created_at": datetime.now()
+        "title": customer_data.get("title", ""),
+        "firstName": customer_data.get("firstName", ""),
+        "lastName": customer_data.get("lastName", ""),
+        "fullName": customer_data.get("fullName", f"{customer_data.get('firstName', '')} {customer_data.get('lastName', '')}".strip()),
+        "phone": customer_data.get("phone", customer_data.get("phoneNumber", "")),
+        "idNumber": customer_data.get("idNumber", ""),
+        "address": customer_data.get("address", {}),
+        "totalContracts": 0,
+        "totalValue": 0,
+        "lastContractDate": None,
+        "contractsID": [],  # Initialize as empty array
+        "storeId": ObjectId(customer_data["storeId"]),
+        "createdBy": ObjectId(user_id),
+        "createdAt": datetime.now(),
+        "updatedAt": datetime.now()
     }
     
     result = await database.customers.insert_one(customer_doc)
     return {"message": "Customer created successfully", "customer_id": str(result.inserted_id)}
 
 @app.get("/customers/search")
-async def search_customers(phone: Optional[str] = None, id_number: Optional[str] = None, store_id: str = None, user_id: str = Depends(verify_token)):
-    query = {"store_id": ObjectId(store_id)}
+async def search_customers(
+    phone: Optional[str] = None, 
+    name: Optional[str] = None,
+    id_number: Optional[str] = None, 
+    store_id: str = None, 
+    user_id: str = Depends(verify_token)
+):
+    query = {"storeId": ObjectId(store_id)}
     
     if phone:
-        query["phone_number"] = {"$regex": phone, "$options": "i"}
+        query["phone"] = {"$regex": phone, "$options": "i"}
+    if name:
+        # Search in both firstName, lastName, and fullName
+        query["$or"] = [
+            {"firstName": {"$regex": name, "$options": "i"}},
+            {"lastName": {"$regex": name, "$options": "i"}},
+            {"fullName": {"$regex": name, "$options": "i"}}
+        ]
     if id_number:
-        query["id_number"] = {"$regex": id_number, "$options": "i"}
+        query["idNumber"] = {"$regex": id_number, "$options": "i"}
     
     customers = await database.customers.find(query).to_list(10)
     for customer in customers:
         customer["_id"] = str(customer["_id"])
-        customer["store_id"] = str(customer["store_id"])
+        if "storeId" in customer:
+            customer["storeId"] = str(customer["storeId"])
+        if "createdBy" in customer:
+            customer["createdBy"] = str(customer["createdBy"])
+        # Ensure contractsID is array
+        if "contractsID" not in customer:
+            customer["contractsID"] = []
+        else:
+            customer["contractsID"] = [str(cid) for cid in customer["contractsID"]]
     
     return customers
 
@@ -481,32 +524,81 @@ async def get_contract(contract_id: str, user_id: str = Depends(verify_token)):
     return contract
 
 @app.post("/contracts")
-async def create_contract(contract_data: ContractCreate, user_id: str = Depends(verify_token)):
+async def create_contract(contract_data: Dict[str, Any], user_id: str = Depends(verify_token)):
     # Generate contract number
     import random
     import string
-    timestamp = datetime.now().strftime("%y%m%d")
-    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    contract_number = f"SCL{timestamp}{random_part}"
+    store_id = contract_data.get("storeId")
+    timestamp = datetime.now().strftime("%Y%m%d")
+    random_part = str(random.randint(100, 999))
+    contract_number = f"STORE{timestamp}{random_part}"
+    
+    # Parse dates
+    start_date = datetime.now()
+    period_days = contract_data.get("pawnDetails", {}).get("periodDays", 90)
+    due_date = start_date + timedelta(days=period_days)
+    
+    # Calculate interest and total amount
+    pawned_price = contract_data.get("pawnDetails", {}).get("pawnedPrice", 0)
+    interest_rate = contract_data.get("pawnDetails", {}).get("interestRate", 10.0)
+    total_interest = round(pawned_price * (interest_rate / 100) * (period_days / 30), 2)
+    remaining_amount = pawned_price + total_interest
     
     contract_doc = {
-        "contract_number": contract_number,
-        "store_id": ObjectId(contract_data.store_id),
-        "customer_id": ObjectId(contract_data.customer_id),
-        "item": contract_data.item,
-        "pawn_details": contract_data.pawn_details,
-        "dates": {
-            "start_date": datetime.now(),
-            "due_date": datetime.now() + timedelta(days=contract_data.pawn_details.get("period_days", 30))
-        },
+        "contractNumber": contract_number,
         "status": "active",
-        "transaction_history": [],
-        "created_at": datetime.now(),
-        "updated_at": datetime.now()
+        "customerId": ObjectId(contract_data["customerId"]),
+        "item": {
+            "brand": contract_data.get("item", {}).get("brand", ""),
+            "model": contract_data.get("item", {}).get("model", ""),
+            "type": contract_data.get("item", {}).get("type", ""),
+            "serialNo": contract_data.get("item", {}).get("serialNo", ""),
+            "accessories": contract_data.get("item", {}).get("accessories", ""),
+            "condition": int(contract_data.get("item", {}).get("condition", 0)),
+            "defects": contract_data.get("item", {}).get("defects", ""),
+            "note": contract_data.get("item", {}).get("note", ""),
+            "images": contract_data.get("item", {}).get("images", [])
+        },
+        "pawnDetails": {
+            "aiEstimatedPrice": contract_data.get("pawnDetails", {}).get("aiEstimatedPrice", 0),
+            "pawnedPrice": pawned_price,
+            "interestRate": interest_rate,
+            "periodDays": period_days,
+            "totalInterest": total_interest,
+            "remainingAmount": remaining_amount
+        },
+        "dates": {
+            "startDate": start_date,
+            "dueDate": due_date,
+            "redeemDate": None,
+            "suspendedDate": None
+        },
+        "transactionHistory": [],
+        "storeId": ObjectId(store_id),
+        "createdBy": ObjectId(user_id),
+        "userId": ObjectId(user_id),
+        "createdAt": datetime.now(),
+        "updatedAt": datetime.now()
     }
     
     result = await database.contracts.insert_one(contract_doc)
-    return {"message": "Contract created successfully", "contract_id": str(result.inserted_id), "contract_number": contract_number}
+    contract_id = str(result.inserted_id)
+    
+    # Update customer: add contract ID to contractsID array and update stats
+    await database.customers.update_one(
+        {"_id": ObjectId(contract_data["customerId"])},
+        {
+            "$push": {"contractsID": ObjectId(contract_id)},
+            "$inc": {"totalContracts": 1, "totalValue": pawned_price},
+            "$set": {"lastContractDate": start_date, "updatedAt": datetime.now()}
+        }
+    )
+    
+    return {
+        "message": "Contract created successfully", 
+        "contract_id": contract_id, 
+        "contract_number": contract_number
+    }
 
 # Dashboard endpoints
 @app.get("/dashboard/stats")
