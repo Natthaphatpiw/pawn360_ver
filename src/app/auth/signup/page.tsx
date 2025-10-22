@@ -69,8 +69,8 @@ export default function SignUpPage() {
     }
 
     try {
-      // API call to signup endpoint
-      const response = await fetch('http://40.81.244.202:8000/auth/signup', {
+      // API call to signup endpoint using Next.js API routes
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -94,16 +94,25 @@ export default function SignUpPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Show success message and redirect to login
-        alert('Account created successfully! Please login with your credentials.');
+        // Store token if provided
+        if (data.access_token) {
+          localStorage.setItem('token', data.access_token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          if (data.store) {
+            localStorage.setItem('store', JSON.stringify(data.store));
+          }
+        }
 
-        // Redirect to login page
-        router.push('/auth/login');
+        // Show success message and redirect to dashboard
+        alert('Account created successfully! Redirecting to dashboard...');
+
+        // Redirect to dashboard
+        router.push('/dashboard');
       } else {
-        setError(data.detail || data.message || 'Signup failed');
+        setError(data.error || data.message || 'Signup failed');
       }
     } catch (err) {
-      setError('Network error. Please check if backend server is running.');
+      setError('Network error. Please try again.');
       console.error('Signup error:', err);
     }
 

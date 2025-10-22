@@ -113,7 +113,7 @@ export default function AccountPage() {
         setUser(userData);
 
         // Fetch user's stores
-        const storesResponse = await fetch('http://40.81.244.202:8000/stores', {
+        const storesResponse = await fetch('/api/stores', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -149,7 +149,7 @@ export default function AccountPage() {
         if (!currentStore) return;
 
         // Fetch customers from the selected store only
-        const response = await fetch(`http://40.81.244.202:8000/customers?store_id=${currentStore._id}`, {
+        const response = await fetch(`/api/customers?store_id=${currentStore._id}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -183,7 +183,7 @@ export default function AccountPage() {
         tax_id: newStoreData.taxId
       };
 
-        const response = await fetch('http://40.81.244.202:8000/stores', {
+        const response = await fetch('/api/stores', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

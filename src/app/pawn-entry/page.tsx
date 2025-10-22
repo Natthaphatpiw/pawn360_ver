@@ -108,7 +108,7 @@ export default function PawnEntryPage() {
       setUser(userData);
 
       // Fetch user's stores
-        const storesResponse = await fetch('http://40.81.244.202:8000/stores', {
+        const storesResponse = await fetch('/api/stores', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -159,7 +159,7 @@ export default function PawnEntryPage() {
     if (phone) params.append('phone', phone);
     if (name) params.append('name', name);
 
-        const response = await fetch(`http://40.81.244.202:8000/customers/search?${params.toString()}`, {
+        const response = await fetch(`/api/customers/search?${params.toString()}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -236,7 +236,7 @@ export default function PawnEntryPage() {
       storeId: selectedStoreId
     };
 
-        const response = await fetch('http://40.81.244.202:8000/customers', {
+        const response = await fetch('/api/customers', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
