@@ -100,7 +100,7 @@ export default function DashboardPage() {
         }
 
         // Fetch user's stores
-        const storesResponse = await fetch('http://40.81.244.202:8000/stores', {
+        const storesResponse = await fetch('/api/stores', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -141,7 +141,7 @@ export default function DashboardPage() {
 
         // Fetch contracts from selected stores
         for (const storeId of selectedStoreIds) {
-          const response = await fetch(`http://40.81.244.202:8000/contracts?storeId=${storeId}`, {
+          const response = await fetch(`/api/contracts?storeId=${storeId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'

@@ -29,8 +29,8 @@ export default function SignInPage() {
     setError('');
 
     try {
-      // Call backend API
-      const response = await fetch('http://40.81.244.202:8000/auth/signin', {
+      // Call Next.js API routes
+      const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,19 +43,22 @@ export default function SignInPage() {
       if (response.ok) {
         // Store token and user data
         localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
         if (data.store) {
           localStorage.setItem('store', JSON.stringify(data.store));
         }
-        
+        if (data.stores) {
+          localStorage.setItem('stores', JSON.stringify(data.stores));
+        }
+
         // Redirect to dashboard
         router.push('/dashboard');
       } else {
-        setError(data.detail || 'Sign in failed');
+        setError(data.error || 'Sign in failed');
       }
     } catch (err) {
-      setError('Network error. Please check if backend server is running.');
+      setError('Network error. Please try again.');
       console.error('Login error:', err);
     }
 

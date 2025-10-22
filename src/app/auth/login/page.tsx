@@ -22,7 +22,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-        const response = await fetch('http://40.81.244.202:8000/auth/signin', {
+        const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
