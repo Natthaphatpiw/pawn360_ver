@@ -57,6 +57,9 @@ interface Contract {
     remainingAmount: number;
     aiEstimatedPrice: number;
     periodDays: number;
+    payInterest: number;
+    fineAmount: number;
+    soldAmount: number;
   };
   item: {
     brand: string;
@@ -563,6 +566,201 @@ export default function ContractDetailPage() {
           </Modal>
         );
 
+      case 'add_fine':
+        return (
+          <Modal 
+            isOpen={true} 
+            onClose={() => setActiveModal(null)} 
+            title="Add Fine"
+          >
+            <div className="space-y-4">
+              <div className="bg-l-grey-1 rounded-lg p-4">
+                <div className="text-sm text-clay-grey">Current Fine Amount</div>
+                <div className="text-xl font-bold text-d-grey-5">{formatCurrency(contract.pawnDetails.fineAmount || 0)}</div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-2">Fine Amount to Add</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                    placeholder="Enter fine amount"
+                    value={modalData.amount || ''}
+                    onChange={(e) => setModalData(prev => ({ ...prev, amount: e.target.value }))}
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-clay-grey">฿</div>
+                </div>
+              </div>
+
+              {modalData.amount && (
+                <div className="bg-red-50 rounded-lg p-4">
+                  <div className="text-sm text-clay-grey">New Fine Amount</div>
+                  <div className="text-xl font-bold text-semantic-red">
+                    {formatCurrency((contract.pawnDetails.fineAmount || 0) + parseInt(modalData.amount || 0))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-2">Reason</label>
+                <textarea 
+                  className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                  rows={3}
+                  placeholder="Reason for fine..."
+                  value={modalData.note || ''}
+                  onChange={(e) => setModalData(prev => ({ ...prev, note: e.target.value }))}
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 px-4 py-3 border border-l-grey-4 text-clay-grey rounded-lg hover:bg-l-grey-1 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleModalSubmit}
+                  className="flex-1 px-4 py-3 bg-semantic-red text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Add Fine
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+
+      case 'paid_fine':
+        return (
+          <Modal 
+            isOpen={true} 
+            onClose={() => setActiveModal(null)} 
+            title="Pay Fine"
+          >
+            <div className="space-y-4">
+              <div className="bg-l-grey-1 rounded-lg p-4">
+                <div className="text-sm text-clay-grey">Current Fine Amount</div>
+                <div className="text-2xl font-bold text-semantic-red">{formatCurrency(contract.pawnDetails.fineAmount || 0)}</div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-2">Payment Amount</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                    placeholder="Enter payment amount"
+                    max={contract.pawnDetails.fineAmount || 0}
+                    value={modalData.amount || ''}
+                    onChange={(e) => setModalData(prev => ({ ...prev, amount: e.target.value }))}
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-clay-grey">฿</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-2">Payment Method</label>
+                <select 
+                  className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                  value={modalData.paymentMethod || ''}
+                  onChange={(e) => setModalData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                >
+                  <option value="">Select payment method</option>
+                  <option value="cash">Cash</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="promptpay">PromptPay</option>
+                </select>
+              </div>
+
+              {modalData.amount && (
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="text-sm text-clay-grey">Remaining Fine Amount</div>
+                  <div className="text-xl font-bold text-leaf-green">
+                    {formatCurrency(Math.max(0, (contract.pawnDetails.fineAmount || 0) - parseInt(modalData.amount || 0)))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 px-4 py-3 border border-l-grey-4 text-clay-grey rounded-lg hover:bg-l-grey-1 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleModalSubmit}
+                  className="flex-1 px-4 py-3 bg-leaf-green text-white rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  Process Payment
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+
+      case 'sold':
+        return (
+          <Modal 
+            isOpen={true} 
+            onClose={() => setActiveModal(null)} 
+            title="Mark as Sold"
+          >
+            <div className="space-y-4">
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-orange-700 mb-2">
+                  <AlertTriangle size={20} />
+                  <span className="font-medium">Notice</span>
+                </div>
+                <p className="text-orange-600 text-sm">
+                  This will mark the contract as sold and record the sale amount.
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-2">Sale Amount</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                    placeholder="Enter sale amount"
+                    value={modalData.amount || ''}
+                    onChange={(e) => setModalData(prev => ({ ...prev, amount: e.target.value }))}
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-clay-grey">฿</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-2">Note (Optional)</label>
+                <textarea 
+                  className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                  rows={3}
+                  placeholder="Add any notes about the sale..."
+                  value={modalData.note || ''}
+                  onChange={(e) => setModalData(prev => ({ ...prev, note: e.target.value }))}
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 px-4 py-3 border border-l-grey-4 text-clay-grey rounded-lg hover:bg-l-grey-1 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleModalSubmit}
+                  className="flex-1 px-4 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  Mark as Sold
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+
       default:
         return null;
     }
@@ -570,9 +768,9 @@ export default function ContractDetailPage() {
 
   return (
     <FixedLayout>
-      <div className={`flex h-full gap-1 ${sarabun.className}`}>
+      <div className={`flex flex-col lg:flex-row h-full gap-1 ${sarabun.className}`}>
         {/* Left Panel - Scrollable */}
-        <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        <div className="w-full lg:w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
           {/* Header */}
           <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
             <div className="flex items-center justify-between">
@@ -762,7 +960,7 @@ export default function ContractDetailPage() {
         </div>
 
         {/* Right Panel - Scrollable */}
-        <div className="w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        <div className="w-full lg:w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
           {/* Loan Summary */}
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-1 mb-4">
@@ -790,10 +988,25 @@ export default function ContractDetailPage() {
                 <span className="font-medium text-gray-900">{contract.pawnDetails.periodDays} days</span>
               </div>
               <div className="border-t border-gray-200 pt-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Interest Amount:</span>
+                <span className="font-medium text-orange-600">{formatCurrency(calculateInterest())} THB</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Interest Paid:</span>
+                <span className="font-medium text-blue-600">{formatCurrency(contract.pawnDetails.payInterest || 0)} THB</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Fine Amount:</span>
+                <span className="font-medium text-red-600">{formatCurrency(contract.pawnDetails.fineAmount || 0)} THB</span>
+              </div>
+              {contract.pawnDetails.soldAmount > 0 && (
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Interest Amount:</span>
-                  <span className="font-medium text-orange-600">{formatCurrency(calculateInterest())} THB</span>
+                  <span className="text-gray-600">Sold Amount:</span>
+                  <span className="font-medium text-purple-600">{formatCurrency(contract.pawnDetails.soldAmount)} THB</span>
                 </div>
+              )}
+              <div className="border-t border-gray-200 pt-4">
                 <div className="flex justify-between items-center text-lg mt-2">
                   <span className="font-semibold text-gray-900">Total Repayment:</span>
                   <span className="font-bold text-[#487C47]">{formatCurrency(calculateTotal())} THB</span>
@@ -801,6 +1014,7 @@ export default function ContractDetailPage() {
               </div>
             </div>
           </div>
+        </div>
 
           {/* Important Dates */}
           <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -850,7 +1064,7 @@ export default function ContractDetailPage() {
                 <CreditCard size={16} />
                 Pay Interest
               </button>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   onClick={() => handleAction('decrease_loan')}
                   className="px-4 py-3 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
@@ -866,6 +1080,29 @@ export default function ContractDetailPage() {
                   Increase
                 </button>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleAction('add_fine')}
+                  className="px-4 py-3 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus size={16} />
+                  Add Fine
+                </button>
+                <button
+                  onClick={() => handleAction('paid_fine')}
+                  className="px-4 py-3 border border-green-500 text-green-500 rounded-lg hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Minus size={16} />
+                  Paid Fine
+                </button>
+              </div>
+              <button
+                onClick={() => handleAction('sold')}
+                className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+              >
+                <DollarSign size={16} />
+                Mark as Sold
+              </button>
               <button
                 onClick={() => handleAction('suspend')}
                 className="w-full px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2"

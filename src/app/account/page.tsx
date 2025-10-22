@@ -113,7 +113,7 @@ export default function AccountPage() {
         setUser(userData);
 
         // Fetch user's stores
-        const storesResponse = await fetch('http://127.0.0.1:8000/stores', {
+        const storesResponse = await fetch('http://40.81.244.202:8000/stores', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -149,7 +149,7 @@ export default function AccountPage() {
         if (!currentStore) return;
 
         // Fetch customers from the selected store only
-        const response = await fetch(`http://127.0.0.1:8000/customers?store_id=${currentStore._id}`, {
+        const response = await fetch(`http://40.81.244.202:8000/customers?store_id=${currentStore._id}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -183,7 +183,7 @@ export default function AccountPage() {
         tax_id: newStoreData.taxId
       };
 
-      const response = await fetch('http://127.0.0.1:8000/stores', {
+        const response = await fetch('http://40.81.244.202:8000/stores', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -264,9 +264,9 @@ export default function AccountPage() {
 
   return (
     <FixedLayout>
-      <div className={`flex h-full gap-1 ${sarabun.className}`}>
+      <div className={`flex flex-col lg:flex-row h-full gap-1 ${sarabun.className}`}>
         {/* Left Panel - Scrollable */}
-        <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        <div className="w-full lg:w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
           {/* Header */}
           <div className="bg-[#F5F4F2] rounded-lg p-6 border border-gray-200">
             <div className="flex items-center justify-between mb-6">
@@ -277,7 +277,7 @@ export default function AccountPage() {
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6">
               <button
                 onClick={() => setActiveTab('profile')}
                 className={`px-8 py-3 rounded-full font-medium transition-colors ${
@@ -554,7 +554,7 @@ export default function AccountPage() {
                         <tbody>
                           {customers.map((customer) => (
                             <tr key={customer._id} className="border-b border-gray-100 hover:bg-gray-50">
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-4 ">
                                 <div className="font-medium text-gray-900">{customer.fullName}</div>
                               </td>
                               <td className="py-3 px-4 text-gray-600">{customer.phone}</td>
@@ -608,7 +608,7 @@ export default function AccountPage() {
         </div>
 
         {/* Right Panel */}
-        <div className="w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        <div className="w-full lg:w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-1 mb-6">
               <h3 className="text-2xl font-semibold text-gray-900">Quick Actions</h3>

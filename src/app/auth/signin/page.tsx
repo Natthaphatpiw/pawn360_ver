@@ -30,7 +30,7 @@ export default function SignInPage() {
 
     try {
       // Call backend API
-      const response = await fetch('http://127.0.0.1:8000/auth/signin', {
+      const response = await fetch('http://40.81.244.202:8000/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -100,7 +100,7 @@ export default function ContractsPage() {
         }
 
         // Fetch user's stores
-        const storesResponse = await fetch('http://127.0.0.1:8000/stores', {
+        const storesResponse = await fetch('http://40.81.244.202:8000/stores', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -141,7 +141,7 @@ export default function ContractsPage() {
 
         // Fetch contracts from selected stores
         for (const storeId of selectedStoreIds) {
-          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${storeId}`, {
+          const response = await fetch(`http://40.81.244.202:8000/contracts?storeId=${storeId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -450,9 +450,9 @@ export default function ContractsPage() {
 
   return (
     <FixedLayout>
-      <div className={`flex h-full gap-1 ${sarabun.className}`}>
+      <div className={`flex flex-col lg:flex-row h-full gap-1 ${sarabun.className}`}>
         {/* Left Panel - Scrollable */}
-        <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        <div className="w-full lg:w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
 
           {/* Search Section */}
           <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
@@ -461,18 +461,18 @@ export default function ContractsPage() {
               <TitleBadge text="ค้นหา" />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center gap-2 justify-between">
-                <div className="gap-[0.1rem] w-1/3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 justify-between">
+                <div className="gap-[0.1rem] w-full sm:w-1/3">
                   <label className="block font-medium text-gray-700 mb-1 text-[16px]">Contract No.</label>
                   <p className="text-gray-500 mb-1 text-[12px]">เลขที่สัญญา</p>
                 </div>
-                <div className="flex gap-2 justify-end">
+                <div className="flex gap-2 justify-end w-full sm:w-auto">
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search contract..."
-                    className="flex-1 px-[9rem] py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="flex-1 w-full sm:w-auto px-4 sm:px-[9rem] py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                   <button
                     onClick={async () => {
@@ -487,7 +487,7 @@ export default function ContractsPage() {
 
                         // Search across selected stores
                         for (const storeId of selectedStoreIds) {
-                          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${storeId}`, {
+                          const response = await fetch(`http://40.81.244.202:8000/contracts?storeId=${storeId}`, {
                             headers: {
                               'Authorization': `Bearer ${token}`,
                               'Content-Type': 'application/json'
@@ -529,13 +529,13 @@ export default function ContractsPage() {
               <TitleBadge text="กรองข้อมูล" />
             </div>
             <div className="space-y-4">
-              <div className="flex items-center gap-2 justify-between">
-                <div className="gap-[0.1rem] w-1/5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 justify-between">
+                <div className="gap-[0.1rem] w-full sm:w-1/5">
                   <label className="block font-medium text-gray-700 mb-1 text-[16px]">Status</label>
                   <p className="text-gray-500 mb-1 text-[12px]">สถานะ</p>
                 </div>
                 <select
-                  className="w-4/5 px-[1rem] py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full sm:w-4/5 px-[1rem] py-[0.5rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
@@ -557,8 +557,8 @@ export default function ContractsPage() {
               <TitleBadge text="รายการสัญญา" />
             </div>
             <div className="bg-white rounded-lg mt-4 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full min-w-[640px]">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">
@@ -659,7 +659,7 @@ export default function ContractsPage() {
         </div>
 
         {/* Right Panel - Scrollable */}
-        <div className="w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        <div className="w-full lg:w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
           {/* Store Filter */}
           <div className="flex justify-end">
             <div className="relative">

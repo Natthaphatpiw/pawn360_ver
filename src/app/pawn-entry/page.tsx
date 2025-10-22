@@ -108,7 +108,7 @@ export default function PawnEntryPage() {
       setUser(userData);
 
       // Fetch user's stores
-      const storesResponse = await fetch('http://127.0.0.1:8000/stores', {
+        const storesResponse = await fetch('http://40.81.244.202:8000/stores', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -159,7 +159,7 @@ export default function PawnEntryPage() {
     if (phone) params.append('phone', phone);
     if (name) params.append('name', name);
 
-    const response = await fetch(`http://127.0.0.1:8000/customers/search?${params.toString()}`, {
+        const response = await fetch(`http://40.81.244.202:8000/customers/search?${params.toString()}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -236,7 +236,7 @@ export default function PawnEntryPage() {
       storeId: selectedStoreId
     };
 
-    const response = await fetch('http://127.0.0.1:8000/customers', {
+        const response = await fetch('http://40.81.244.202:8000/customers', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -270,19 +270,27 @@ export default function PawnEntryPage() {
 
   // Contract preview functions
   const handleShowContractPreview = () => {
-    // Validate required fields
+    // Validate required fields for contract tab (existing customer)
     if (activeTab === 'contracts' && !selectedCustomer) {
       alert('กรุณาเลือกลูกค้าก่อน');
       return;
     }
-    
+
+    // Validate required fields for register tab (new customer)
+    if (activeTab === 'register') {
+      if (!customerData.firstName || !customerData.lastName || !customerData.phoneNumber || !customerData.idNumber) {
+        alert('กรุณากรอกข้อมูลลูกค้าให้ครบถ้วน (ชื่อ, นามสกุล, เบอร์โทรศัพท์, เลขบัตรประชาชน)');
+        return;
+      }
+    }
+
     if (!itemData.brand || !itemData.model || !itemData.type) {
-      alert('กรุณากรอกข้อมูลสินค้าให้ครบถ้วน');
+      alert('กรุณากรอกข้อมูลสินค้าให้ครบถ้วน (ยี่ห้อ, รุ่น, ประเภท)');
       return;
     }
 
     if (!pawnDetails.pawnedPrice || !pawnDetails.periodDays) {
-      alert('กรุณากรอกรายละเอียดการจำนำให้ครบถ้วน');
+      alert('กรุณากรอกรายละเอียดการจำนำให้ครบถ้วน (ราคาจำนำ, ระยะเวลา)');
       return;
     }
 
@@ -295,12 +303,18 @@ export default function PawnEntryPage() {
 
   const handleCreateContract = async () => {
     const token = localStorage.getItem('access_token');
-    if (!token || !selectedStoreId) return;
+    if (!token || !selectedStoreId || !user) return;
 
     let customerId = selectedCustomer?._id;
 
     // If in Register tab and no customer selected, create customer first
     if (activeTab === 'register' || !customerId) {
+      // Validate customer data for new registration
+      if (!customerData.firstName || !customerData.lastName || !customerData.phoneNumber || !customerData.idNumber) {
+        alert('กรุณากรอกข้อมูลลูกค้าให้ครบถ้วน (ชื่อ, นามสกุล, เบอร์โทรศัพท์, เลขบัตรประชาชน)');
+        return;
+      }
+
       const customerPayload = {
         title: customerData.title,
         firstName: customerData.firstName,
@@ -318,10 +332,12 @@ export default function PawnEntryPage() {
           country: customerData.country,
           postcode: customerData.postcode
         },
-        storeId: selectedStoreId
+        storeId: selectedStoreId,
+        createdBy: user._id
       };
 
-      const customerResponse = await fetch('http://127.0.0.1:8000/customers', {
+      // Create customer in MongoDB via API
+      const customerResponse = await fetch('/api/customers', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -332,14 +348,22 @@ export default function PawnEntryPage() {
 
       if (customerResponse.ok) {
         const customerResult = await customerResponse.json();
-        customerId = customerResult.customer_id;
+        customerId = customerResult.customerId;
+        console.log('Created new customer with ID:', customerId);
       } else {
-        alert('เกิดข้อผิดพลาดในการสร้างข้อมูลลูกค้า');
+        const errorData = await customerResponse.json();
+        alert(`เกิดข้อผิดพลาดในการสร้างข้อมูลลูกค้า: ${errorData.error || 'Unknown error'}`);
         return;
       }
     }
 
-    // Create contract
+    // Validate customerId before creating contract
+    if (!customerId) {
+      alert('ไม่สามารถสร้างสัญญาได้ เนื่องจากไม่มีข้อมูลลูกค้า');
+      return;
+    }
+
+    // Create contract with the customer ID (either existing or newly created)
     const contractPayload = {
       customerId: customerId,
       item: {
@@ -348,7 +372,7 @@ export default function PawnEntryPage() {
         type: itemData.type,
         serialNo: itemData.serialNo,
         accessories: itemData.accessories,
-        condition: itemData.condition,
+        condition: parseInt(itemData.condition),
         defects: itemData.defects,
         note: itemData.note,
         images: []
@@ -359,10 +383,15 @@ export default function PawnEntryPage() {
         interestRate: 10.0,
         periodDays: parseInt(pawnDetails.periodDays)
       },
-      storeId: selectedStoreId
+      storeId: selectedStoreId,
+      createdBy: user._id,
+      paymentMethod: 'cash'
     };
 
-    const contractResponse = await fetch('http://127.0.0.1:8000/contracts', {
+    console.log('Creating contract with payload:', contractPayload);
+
+    // Create contract in MongoDB via API
+    const contractResponse = await fetch('/api/contracts', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -373,11 +402,46 @@ export default function PawnEntryPage() {
 
     if (contractResponse.ok) {
       const result = await contractResponse.json();
-      alert(`สร้างสัญญาสำเร็จ! เลขที่สัญญา: ${result.contract_number}`);
+      alert(`สร้างสัญญาสำเร็จ! เลขที่สัญญา: ${result.contractNumber}`);
+
+      // Reset forms
+      setSelectedCustomer(null);
+      setCustomerData({
+        title: '',
+        firstName: '',
+        lastName: '',
+        phoneNumber: '',
+        idNumber: '',
+        address: '',
+        village: '',
+        street: '',
+        subDistrict: '',
+        district: '',
+        province: '',
+        country: 'ประเทศไทย',
+        postcode: ''
+      });
+      setItemData({
+        brand: '',
+        model: '',
+        type: '',
+        serialNo: '',
+        accessories: '',
+        condition: '0',
+        defects: '',
+        note: ''
+      });
+      setPawnDetails({
+        aiEstimatedPrice: 100000,
+        pawnedPrice: '',
+        periodDays: ''
+      });
+
       setShowContractPreview(false);
       router.push('/contracts');
     } else {
-      alert('เกิดข้อผิดพลาดในการสร้างสัญญา');
+      const errorData = await contractResponse.json();
+      alert(`เกิดข้อผิดพลาดในการสร้างสัญญา: ${errorData.error || 'Unknown error'}`);
     }
   };
 
@@ -663,9 +727,9 @@ export default function PawnEntryPage() {
   return (
     <>
       <FixedLayout>
-        <div className={`flex h-full gap-1 ${sarabun.className}`}>
+        <div className={`flex flex-col lg:flex-row h-full gap-1 ${sarabun.className}`}>
         {/* Left Panel - Scrollable */}
-        <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        <div className="w-full lg:w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
           {/* Tabs */}
           <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
             <div className="flex gap-2">
@@ -1276,7 +1340,7 @@ export default function PawnEntryPage() {
         </div>
         
         {/* Right Panel - Scrollable */}
-        <div className="w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+        <div className="w-full lg:w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
           {/* Calendar */}
           <div className="bg-white rounded-2xl p-4 border border-gray-200 flex flex-col gap-1">
                 <div className="flex items-center justify-between mb-3">

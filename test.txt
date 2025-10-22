@@ -1,4 +1,0 @@
-ข้อมูลสำหรับการทดสอบ:
-   Email: test@pawnshop.com
-   Password: password123
-   Role: owner

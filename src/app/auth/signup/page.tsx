@@ -70,7 +70,7 @@ export default function SignUpPage() {
 
     try {
       // API call to signup endpoint
-      const response = await fetch('http://127.0.0.1:8000/auth/signup', {
+      const response = await fetch('http://40.81.244.202:8000/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

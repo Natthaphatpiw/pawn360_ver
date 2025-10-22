@@ -36,6 +36,9 @@ interface Contract {
     interestRate: number;
     totalInterest: number;
     remainingAmount: number;
+    payInterest?: number;
+    fineAmount?: number;
+    soldAmount?: number;
   };
   item: {
     brand: string;
@@ -97,7 +100,7 @@ export default function DashboardPage() {
         }
 
         // Fetch user's stores
-        const storesResponse = await fetch('http://127.0.0.1:8000/stores', {
+        const storesResponse = await fetch('http://40.81.244.202:8000/stores', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -138,7 +141,7 @@ export default function DashboardPage() {
 
         // Fetch contracts from selected stores
         for (const storeId of selectedStoreIds) {
-          const response = await fetch(`http://127.0.0.1:8000/contracts?storeId=${storeId}`, {
+          const response = await fetch(`http://40.81.244.202:8000/contracts?storeId=${storeId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -212,8 +215,30 @@ export default function DashboardPage() {
     customerName: contract.customer?.fullName || 'ไม่ทราบชื่อ'
   }));
 
-  // Calculate total value from filtered contracts
-  const totalValue = filteredContracts.reduce((sum, contract) => sum + contract.pawnDetails.pawnedPrice, 0);
+  // Calculate total value from filtered contracts (exclude sold, suspended and redeemed)
+  // Include: pawnedPrice + totalInterest + fineAmount + payInterest
+  const activeContracts = filteredContracts.filter(contract => 
+    contract.status !== 'sold' && contract.status !== 'suspended' && contract.status !== 'redeemed'
+  );
+  const totalValue = activeContracts.reduce((sum, contract) => {
+    const principal = contract.pawnDetails.pawnedPrice || 0;
+    const interest = contract.pawnDetails.totalInterest || 0;
+    const fine = contract.pawnDetails.fineAmount || 0;
+    const paidInterest = contract.pawnDetails.payInterest || 0;
+    return sum + principal + interest + fine + paidInterest;
+  }, 0);
+
+  // Calculate sold contracts value using soldAmount
+  const soldContracts = filteredContracts.filter(contract => contract.status === 'sold');
+  const soldValue = soldContracts.reduce((sum, contract) => 
+    sum + (contract.pawnDetails.soldAmount || 0), 0
+  );
+
+  // Calculate suspended contracts value (awaiting sale) - only pawnedPrice
+  const suspendedContracts = filteredContracts.filter(contract => contract.status === 'suspended');
+  const suspendedValue = suspendedContracts.reduce((sum, contract) => 
+    sum + contract.pawnDetails.pawnedPrice, 0
+  );
 
   // Calculate current items data for legend
   const getCurrentItemsData = () => {
@@ -488,8 +513,8 @@ export default function DashboardPage() {
 
   return (
     <FixedLayout>
-    <div className={`flex h-full gap-1 ${prompt.className}`}>
-      <div className="w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
+    <div className={`flex flex-col lg:flex-row h-full gap-1 ${prompt.className}`}>
+      <div className="w-full lg:w-2/3 p-1 h-full flex flex-col gap-3 overflow-y-auto max-h-full">
         {/* Top Header Section with Store Filter */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -570,25 +595,35 @@ export default function DashboardPage() {
         {/* Top Card Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-shrink-0">
           {/* Card 1: Awaiting sale */}
-          <div className="bg-[#B4CDB9] rounded-2xl p-4 border border-green-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-green-800">Awaiting sale</h3>
-              <p className="text-sm text-green-700">มูลค่ารอขาย</p>
+          <div className="bg-[#B4CDB9] rounded-2xl p-4 border border-green-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-green-800">Awaiting sale</h3>
+                <p className="text-sm text-green-700">มูลค่ารอขาย</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-green-700">THB</p>
+                <p className="text-2xl font-medium text-green-800">{suspendedValue.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-green-700">THB</p>
-              <p className="text-2xl font-medium text-green-800">-</p>
+            <div className="mt-2 text-xs text-green-700">
+              {suspendedContracts.length} contract{suspendedContracts.length !== 1 ? 's' : ''}
             </div>
           </div>
           {/* Card 2: Sold */}
-          <div className="bg-gray-100 rounded-2xl p-4 border border-gray-200 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">Sold</h3>
-              <p className="text-sm text-gray-600">มูลค่าขายแล้ว</p>
+          <div className="bg-gray-100 rounded-2xl p-4 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">Sold</h3>
+                <p className="text-sm text-gray-600">มูลค่าขายแล้ว</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">THB</p>
+                <p className="text-2xl font-medium text-gray-800">{soldValue.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500">THB</p>
-              <p className="text-2xl font-medium text-gray-800">0.00</p>
+            <div className="mt-2 text-xs text-gray-600">
+              {soldContracts.length} contract{soldContracts.length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
@@ -650,13 +685,13 @@ export default function DashboardPage() {
         {/* Bottom Contracts Section */}
         
           <div className="bg-[#FFF4E5] rounded-2xl p-3 border border-[#FEC97C]">
-            <div className="grid grid-cols-1 md:grid-cols-3 flex-shrink-0 justify-between items-center cursor-pointer" onClick={() => setIsDueSoonExpanded(!isDueSoonExpanded)}>
+            <div className="flex flex-col md:grid md:grid-cols-1 lg:grid-cols-3 gap-3 justify-between items-start md:items-center cursor-pointer" onClick={() => setIsDueSoonExpanded(!isDueSoonExpanded)}>
                 <div>
                     <h3 className="text-base font-semibold text-gray-800">Contracts due soon(D+3)</h3>
                     <p className="text-xs text-gray-600 font-light">สัญญากำลังจะถึงกำหนดในอีก 3 วัน</p>
                 </div>
-                <div></div>
-                <div className="grid grid-cols-1 md:grid-cols-3 flex items-center gap-3 sm:gap-4">
+                <div className="hidden lg:block"></div>
+                <div className="flex md:grid md:grid-cols-1 lg:grid-cols-3 items-center gap-3 sm:gap-4 w-full md:w-auto">
                     <div className="text-center">
                         <p className="text-[10px] text-gray-500">Number</p>
                         <p className="font-medium text-gray-800 text-[18px]">{contractsDueSoon.length}</p>
@@ -699,13 +734,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="bg-green-50 rounded-2xl p-3 border border-[#96C996]">
-            <div className="grid grid-cols-1 md:grid-cols-3 flex-shrink-0 justify-between items-center cursor-pointer" onClick={() => setIsOverdueExpanded(!isOverdueExpanded)}>
+            <div className="flex flex-col md:grid md:grid-cols-1 lg:grid-cols-3 gap-3 justify-between items-start md:items-center cursor-pointer" onClick={() => setIsOverdueExpanded(!isOverdueExpanded)}>
                 <div>
                     <h3 className="text-base font-semibold text-gray-800">Overdue contracts(D-7)</h3>
                     <p className="text-xs text-gray-600 font-light">สัญญาที่ขาดกำหนดเกินกำหนดมาไม่เกิน 7 วัน</p>
                 </div>
-                <div></div>
-                <div className="grid grid-cols-1 md:grid-cols-3 flex items-center gap-3 sm:gap-4">
+                <div className="hidden lg:block"></div>
+                <div className="flex md:grid md:grid-cols-1 lg:grid-cols-3 items-center gap-3 sm:gap-4 w-full md:w-auto">
                     <div className="text-center">
                         <p className="text-[10px] text-gray-500">Number</p>
                         <p className="font-medium text-gray-800 text-[18px]">{contractsOverdue.length}</p>
@@ -748,13 +783,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="bg-red-50 rounded-2xl p-3 border border-[#F19DA2]">
-            <div className="grid grid-cols-1 md:grid-cols-3 flex-shrink-0 justify-between items-center cursor-pointer" onClick={() => setIsSuspendedExpanded(!isSuspendedExpanded)}>
+            <div className="flex flex-col md:grid md:grid-cols-1 lg:grid-cols-3 gap-3 justify-between items-start md:items-center cursor-pointer" onClick={() => setIsSuspendedExpanded(!isSuspendedExpanded)}>
                 <div>
                     <h3 className="text-base font-semibold text-gray-800">Suspended contracts</h3>
                     <p className="text-xs text-gray-600 font-light">สถานะกำลังจะหลุดจำนำ</p>
                 </div>
-                <div></div>
-                <div className="grid grid-cols-1 md:grid-cols-3 flex items-center gap-3 sm:gap-4">
+                <div className="hidden lg:block"></div>
+                <div className="flex md:grid md:grid-cols-1 lg:grid-cols-3 items-center gap-3 sm:gap-4 w-full md:w-auto">
                     <div className="text-center">
                         <p className="text-[10px] text-gray-500">Number</p>
                         <p className="font-medium text-gray-800 text-[18px]">{contractsSuspended.length}</p>
@@ -796,7 +831,7 @@ export default function DashboardPage() {
             )}
           </div>
       </div>
-      <div className="w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto">
+      <div className="w-full lg:w-1/3 p-1 h-full flex flex-col gap-3 overflow-y-auto">
         <div className="grid grid-cols-1 md:grid-cols-1 gap-3 flex-shrink-0 ml-auto">
           <div className="flex items-center gap-2">
             <h2 className="font-medium text-gray-800 text-[18px]">Pawned property value</h2>
@@ -804,14 +839,19 @@ export default function DashboardPage() {
           </div>
         </div>
         {/* Top Card Section */}
-        <div className="bg-[#0A4215] text-[#F5F4F2] rounded-2xl p-4 flex items-center justify-between">
-          <div>
-            <p className="text-lg font-semibold">Today Value</p>
-            <p className="text-sm opacity-80">มูลค่ารวม</p>
+        <div className="bg-[#0A4215] text-[#F5F4F2] rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-lg font-semibold">Today Value</p>
+              <p className="text-sm opacity-80">มูลค่ารวม</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs opacity-80">THB</p>
+              <p className="text-2xl text-right flex justify-end">{totalValue.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs opacity-80">THB</p>
-            <p className="text-2xl text-right flex justify-end">{totalValue.toLocaleString()}.00</p>
+          <div className="mt-2 text-xs opacity-80">
+            {activeContracts.length} active contract{activeContracts.length !== 1 ? 's' : ''}
           </div>
         </div>
           <div className="flex flex-col gap-3">

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:init": "echo 'Database initialization scripts removed - use MongoDB Atlas or local MongoDB'",
+    "db:reset": "echo 'Database reset scripts removed - use MongoDB Atlas or local MongoDB'"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.33.0",
