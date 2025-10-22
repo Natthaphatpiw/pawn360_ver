@@ -1,76 +1,95 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
+import { getUserIdFromToken } from '@/lib/auth';
 import { ObjectId } from 'mongodb';
 
 export async function GET(request: NextRequest) {
   try {
+    const userId = getUserIdFromToken(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const db = await getDatabase();
     const { searchParams } = new URL(request.url);
     const storeId = searchParams.get('storeId');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
     const status = searchParams.get('status');
-    const search = searchParams.get('search');
 
     if (!storeId) {
       return NextResponse.json({ error: 'Store ID is required' }, { status: 400 });
     }
 
     const storeObjectId = new ObjectId(storeId);
-    const skip = (page - 1) * limit;
-
-    // Build query
     const query: any = { storeId: storeObjectId };
 
     if (status) {
       query.status = status;
     }
 
-    if (search) {
-      query.$or = [
-        { contractNumber: { $regex: search, $options: 'i' } },
-        { 'item.brand': { $regex: search, $options: 'i' } },
-        { 'item.model': { $regex: search, $options: 'i' } }
-      ];
+    const contracts = await db.collection('contracts').find(query).toArray();
+
+    // Helper function to convert ObjectIds and datetimes
+    function convertObjectIds(obj: any): any {
+      if (obj instanceof ObjectId) {
+        return obj.toString();
+      } else if (obj instanceof Date) {
+        return obj.toISOString();
+      } else if (typeof obj === 'object' && obj !== null) {
+        if (Array.isArray(obj)) {
+          return obj.map(convertObjectIds);
+        } else {
+          const result: any = {};
+          for (const [key, value] of Object.entries(obj)) {
+            result[key] = convertObjectIds(value);
+          }
+          return result;
+        }
+      } else {
+        return obj;
+      }
     }
 
-    // Get contracts with customer data
-    const contracts = await db.collection('contracts')
-      .aggregate([
-        { $match: query },
-        {
-          $lookup: {
-            from: 'customers',
-            localField: 'customerId',
-            foreignField: '_id',
-            as: 'customer'
-          }
-        },
-        {
-          $addFields: {
-            customer: { $arrayElemAt: ['$customer', 0] }
-          }
-        },
-        { $sort: { createdAt: -1 } },
-        { $skip: skip },
-        { $limit: limit }
-      ])
-      .toArray();
+    // Convert to frontend format
+    const convertedContracts = [];
+    for (const contract of contracts) {
+      // First, convert all ObjectIds to strings
+      const convertedContract = convertObjectIds(contract);
 
-    // Get total count for pagination
-    const totalCount = await db.collection('contracts').countDocuments(query);
-    const totalPages = Math.ceil(totalCount / limit);
-
-    return NextResponse.json({
-      contracts,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        totalCount,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
+      // Get customer info (using string ID now)
+      const customer = await db.collection('customers').findOne({ "_id": new ObjectId(convertedContract["customerId"]) });
+      if (customer) {
+        convertedContract["customer"] = {
+          "fullName": customer.fullName || "",
+          "phone": customer.phone || "",
+          "idNumber": customer.idNumber || ""
+        };
+      } else {
+        // Fallback if customer not found
+        convertedContract["customer"] = {
+          "fullName": "ลูกค้าไม่ทราบชื่อ",
+          "phone": "",
+          "idNumber": ""
+        };
       }
-    });
+
+      // Ensure pawnDetails has correct structure with all fields
+      if ("pawnDetails" in convertedContract) {
+        const pawnDetails = convertedContract["pawnDetails"];
+        convertedContract["pawnDetails"] = {
+          "pawnedPrice": pawnDetails.pawnedPrice || 0,
+          "interestRate": pawnDetails.interestRate || 0,
+          "totalInterest": pawnDetails.totalInterest || 0,
+          "remainingAmount": pawnDetails.remainingAmount || 0,
+          "payInterest": pawnDetails.payInterest || 0,
+          "fineAmount": pawnDetails.fineAmount || 0,
+          "soldAmount": pawnDetails.soldAmount || 0
+        };
+      }
+
+      convertedContracts.push(convertedContract);
+    }
+
+    return NextResponse.json(convertedContracts);
   } catch (error) {
     console.error('Contracts API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -79,75 +98,91 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = getUserIdFromToken(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const db = await getDatabase();
     const contractData = await request.json();
 
     // Generate contract number
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    const contractNumber = `CNT${dateStr}${randomSuffix}`;
+    const startDate = new Date();
+    const periodDays = contractData.pawnDetails?.periodDays || 90;
+    const dueDate = new Date(startDate);
+    dueDate.setDate(dueDate.getDate() + periodDays);
 
-    // Calculate due date
-    const dueDate = new Date(now);
-    dueDate.setDate(dueDate.getDate() + contractData.pawnDetails.periodDays);
+    // Calculate interest and total amount
+    const pawnedPrice = contractData.pawnDetails?.pawnedPrice || 0;
+    const interestRate = contractData.pawnDetails?.interestRate || 10.0;
+    const totalInterest = Math.round(pawnedPrice * (interestRate / 100) * (periodDays / 30) * 100) / 100;
+    const remainingAmount = pawnedPrice + totalInterest;
 
-    // Calculate total interest
-    const totalInterest = contractData.pawnDetails.pawnedPrice *
-      (contractData.pawnDetails.interestRate / 100) *
-      (contractData.pawnDetails.periodDays / 30);
+    // Generate contract number
+    const timestamp = startDate.toISOString().slice(0, 10).replace(/-/g, '');
+    const randomPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const contractNumber = `STORE${timestamp}${randomPart}`;
 
-    const newContract = {
-      _id: new ObjectId(),
+    const contractDoc = {
       contractNumber,
       status: 'active',
       customerId: new ObjectId(contractData.customerId),
-      item: contractData.item,
+      item: {
+        brand: contractData.item?.brand || '',
+        model: contractData.item?.model || '',
+        type: contractData.item?.type || '',
+        serialNo: contractData.item?.serialNo || '',
+        accessories: contractData.item?.accessories || '',
+        condition: contractData.item?.condition || 0,
+        defects: contractData.item?.defects || '',
+        note: contractData.item?.note || '',
+        images: contractData.item?.images || []
+      },
       pawnDetails: {
-        ...contractData.pawnDetails,
+        aiEstimatedPrice: contractData.pawnDetails?.aiEstimatedPrice || 0,
+        pawnedPrice,
+        interestRate,
+        periodDays,
         totalInterest,
-        remainingAmount: contractData.pawnDetails.pawnedPrice + totalInterest
+        remainingAmount,
+        payInterest: 0,
+        fineAmount: 0,
+        soldAmount: 0
       },
       dates: {
-        startDate: now,
+        startDate,
         dueDate,
         redeemDate: null,
         suspendedDate: null
       },
       transactionHistory: [],
       storeId: new ObjectId(contractData.storeId),
-      createdBy: new ObjectId(contractData.createdBy),
-      createdAt: now,
-      updatedAt: now
+      createdBy: new ObjectId(userId),
+      userId: new ObjectId(userId),
+      createdAt: startDate,
+      updatedAt: startDate
     };
 
-    const result = await db.collection('contracts').insertOne(newContract);
+    const result = await db.collection('contracts').insertOne(contractDoc);
+    const contractId = result.insertedId.toString();
 
-    // Create initial pawn transaction
-    const pawnTransaction = {
-      _id: new ObjectId(),
-      type: 'pawn',
-      amount: contractData.pawnDetails.pawnedPrice,
-      paymentMethod: contractData.paymentMethod || 'cash',
-      contractId: result.insertedId,
-      customerId: new ObjectId(contractData.customerId),
-      processedBy: new ObjectId(contractData.createdBy),
-      note: 'Initial pawn transaction',
-      beforeBalance: 0,
-      afterBalance: contractData.pawnDetails.pawnedPrice,
-      storeId: new ObjectId(contractData.storeId),
-      createdAt: now
-    };
-
-    await db.collection('transactions').insertOne(pawnTransaction);
+    // Update customer: add contract ID to contractsID array and update stats
+    await db.collection('customers').updateOne(
+      { "_id": new ObjectId(contractData.customerId) },
+      {
+        $push: { contractsID: contractId },
+        $inc: { totalContracts: 1, totalValue: pawnedPrice },
+        $set: { lastContractDate: startDate, updatedAt: new Date() }
+      } as any
+    );
 
     return NextResponse.json({
-      success: true,
-      contractId: result.insertedId,
-      contractNumber
+      message: 'Contract created successfully',
+      contract_id: contractId,
+      contract_number: contractNumber
     });
   } catch (error) {
-    console.error('Create contract API error:', error);
+    console.error('Create contract error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

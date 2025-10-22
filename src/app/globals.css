@@ -180,3 +180,37 @@ a {
   color: #FF9800;
   border: 1px solid #FF9800;
 }
+
+/* Mobile responsive utilities */
+@media (max-width: 768px) {
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .mobile-full-width {
+    width: 100% !important;
+  }
+
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+
+  .mobile-text-sm {
+    font-size: 0.875rem !important;
+  }
+
+  .mobile-p-2 {
+    padding: 0.5rem !important;
+  }
+}
+
+/* Tablet responsive utilities */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .tablet-hidden {
+    display: none !important;
+  }
+
+  .tablet-full-width {
+    width: 100% !important;
+  }
+}

@@ -38,8 +38,9 @@ export async function POST(
     // Handle different action types
     switch (actionData.type) {
       case 'pay_interest':
-        // Update remaining amount after interest payment
+        // Update remaining amount after interest payment and track total interest paid
         updateData['pawnDetails.remainingAmount'] = Math.max(0, contract.pawnDetails.remainingAmount - actionData.amount);
+        updateData['pawnDetails.payInterest'] = (contract.pawnDetails.payInterest || 0) + actionData.amount;
         transactionData.beforeBalance = contract.pawnDetails.remainingAmount;
         transactionData.afterBalance = updateData['pawnDetails.remainingAmount'];
         break;
@@ -85,6 +86,29 @@ export async function POST(
         transactionData.note = actionData.reason ? `${actionData.reason}: ${actionData.note || ''}` : actionData.note;
         break;
 
+      case 'add_fine':
+        // Add fine to the contract
+        updateData['pawnDetails.fineAmount'] = (contract.pawnDetails.fineAmount || 0) + actionData.amount;
+        transactionData.beforeBalance = contract.pawnDetails.fineAmount || 0;
+        transactionData.afterBalance = updateData['pawnDetails.fineAmount'];
+        break;
+
+      case 'paid_fine':
+        // Reduce fine amount when customer pays
+        updateData['pawnDetails.fineAmount'] = Math.max(0, (contract.pawnDetails.fineAmount || 0) - actionData.amount);
+        transactionData.beforeBalance = contract.pawnDetails.fineAmount || 0;
+        transactionData.afterBalance = updateData['pawnDetails.fineAmount'];
+        break;
+
+      case 'sold':
+        // Mark contract as sold and record sale amount
+        updateData.status = 'sold';
+        updateData['pawnDetails.soldAmount'] = actionData.amount;
+        updateData['dates.soldDate'] = now;
+        transactionData.beforeBalance = 0;
+        transactionData.afterBalance = actionData.amount;
+        break;
+
       default:
         return NextResponse.json({ error: 'Invalid action type' }, { status: 400 });
     }
@@ -94,7 +118,8 @@ export async function POST(
       { _id: contractObjectId },
       {
         $set: updateData,
-        $push: { transactionHistory: transactionData._id }
+        // @ts-ignore - MongoDB ObjectId type compatibility
+        $push: { transactionHistory: transactionData._id.toString() }
       }
     );
 
