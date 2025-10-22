@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         logoUrl: null,
         stampUrl: null,
         signatureUrl: null,
-        interestPresets: [],
+        interestRate: store.interestRate || [], // Array of {days: rate} objects
         contractTemplate: {
           header: 'สัญญาจำนำ',
           footer: 'ขอบคุณที่ใช้บริการ',

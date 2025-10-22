@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Mail, Lock, Building, MapPin, Phone, CreditCard } from 'lucide-react';
+import { User, Mail, Lock, Building, MapPin, Phone, CreditCard, Plus, Trash2, Percent, Calendar } from 'lucide-react';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -13,7 +13,7 @@ export default function SignUpPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    
+
     // Store Information
     storeName: '',
     address: {
@@ -24,7 +24,8 @@ export default function SignUpPage() {
       postcode: ''
     },
     phone: '',
-    taxId: ''
+    taxId: '',
+    interestRate: [] as Array<{days: number, rate: number}> // Array of {days: number, rate: number}
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +33,7 @@ export default function SignUpPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
+
     if (name.startsWith('address.')) {
       const addressField = name.split('.')[1];
       setFormData(prev => ({
@@ -48,6 +49,30 @@ export default function SignUpPage() {
         [name]: value
       }));
     }
+  };
+
+  // Handle interest rate functions
+  const addInterestRate = () => {
+    setFormData(prev => ({
+      ...prev,
+      interestRate: [...prev.interestRate, { days: 0, rate: 0 }]
+    }));
+  };
+
+  const updateInterestRate = (index: number, field: 'days' | 'rate', value: number) => {
+    setFormData(prev => ({
+      ...prev,
+      interestRate: prev.interestRate.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
+  const removeInterestRate = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      interestRate: prev.interestRate.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,7 +111,8 @@ export default function SignUpPage() {
             store_name: formData.storeName,
             address: formData.address,
             phone: formData.phone,
-            tax_id: formData.taxId
+            tax_id: formData.taxId,
+            interestRate: formData.interestRate
           }
         }),
       });
@@ -263,6 +289,73 @@ export default function SignUpPage() {
                   className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
                   placeholder="Enter tax identification number"
                 />
+              </div>
+
+              {/* Interest Rates Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-md font-medium text-clay-grey flex items-center gap-2">
+                    <Percent size={16} className="text-leaf-green" />
+                    Interest Rates (Optional)
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={addInterestRate}
+                    className="flex items-center gap-2 px-3 py-1 bg-leaf-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                  >
+                    <Plus size={16} />
+                    Add Rate
+                  </button>
+                </div>
+
+                {formData.interestRate.length > 0 && (
+                  <div className="space-y-3">
+                    {formData.interestRate.map((rate, index) => (
+                      <div key={index} className="flex items-center gap-3 p-3 bg-l-grey-1 rounded-lg">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Calendar size={16} className="text-leaf-green" />
+                          <input
+                            type="number"
+                            placeholder="Days"
+                            value={rate.days || ''}
+                            onChange={(e) => updateInterestRate(index, 'days', parseInt(e.target.value) || 0)}
+                            className="w-20 px-3 py-2 border border-l-grey-4 rounded-lg form-input text-sm"
+                            min="1"
+                          />
+                          <span className="text-clay-grey">days</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-1">
+                          <Percent size={16} className="text-leaf-green" />
+                          <input
+                            type="number"
+                            placeholder="Rate %"
+                            value={rate.rate || ''}
+                            onChange={(e) => updateInterestRate(index, 'rate', parseFloat(e.target.value) || 0)}
+                            className="w-24 px-3 py-2 border border-l-grey-4 rounded-lg form-input text-sm"
+                            step="0.01"
+                            min="0"
+                          />
+                          <span className="text-clay-grey">%</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeInterestRate(index)}
+                          className="p-2 text-semantic-red hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {formData.interestRate.length === 0 && (
+                  <p className="text-sm text-clay-grey italic">
+                    No interest rates added yet. Click "Add Rate" to add your first interest rate option.
+                  </p>
+                )}
               </div>
 
               {/* Address Fields */}
