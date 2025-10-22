@@ -76,6 +76,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       phone: storeData.phone,
       taxId: storeData.tax_id,
       address: storeData.address,
+      interestRate: storeData.interestRate || [], // Update interest rates if provided
       updatedAt: new Date()
     };
 
