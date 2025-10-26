@@ -3,12 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import FixedLayout from '@/components/layout/FixedLayout';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   Plus,
   ChevronLeft,
   ChevronRight,
   Search,
-  X
+  X,
+  Upload,
+  Image,
+  Trash2
 } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
 const sarabun = Sarabun({
@@ -72,6 +75,10 @@ export default function PawnEntryPage() {
     defects: '',
     note: ''
   });
+
+  // Item images state
+  const [itemImages, setItemImages] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   // Pawn details state
   const [pawnDetails, setPawnDetails] = useState({
@@ -307,8 +314,8 @@ export default function PawnEntryPage() {
 
     let customerId = selectedCustomer?._id;
 
-    // If in Register tab and no customer selected, create customer first
-    if (activeTab === 'register' || !customerId) {
+    // If no customer selected (either new customer registration or using register tab), create customer first
+    if (!customerId) {
       // Validate customer data for new registration
       if (!customerData.firstName || !customerData.lastName || !customerData.phoneNumber || !customerData.idNumber) {
         alert('กรุณากรอกข้อมูลลูกค้าให้ครบถ้วน (ชื่อ, นามสกุล, เบอร์โทรศัพท์, เลขบัตรประชาชน)');
@@ -363,6 +370,26 @@ export default function PawnEntryPage() {
       return;
     }
 
+    // Validate required item data
+    if (!itemData.brand || !itemData.model || !itemData.type) {
+      alert('กรุณากรอกข้อมูลสินค้าให้ครบถ้วน (ยี่ห้อ, รุ่น, ประเภท)');
+      return;
+    }
+
+    // Validate pawn details
+    if (!pawnDetails.pawnedPrice || !pawnDetails.periodDays) {
+      alert('กรุณากรอกข้อมูลการจำนำให้ครบถ้วน (ราคาจำนำ, ระยะเวลา)');
+      return;
+    }
+
+    const pawnedPrice = parseFloat(pawnDetails.pawnedPrice);
+    const periodDays = parseInt(pawnDetails.periodDays);
+
+    if (pawnedPrice <= 0 || periodDays < 3 || periodDays > 365) {
+      alert('ราคาจำนำต้องมากกว่า 0 และระยะเวลาต้องอยู่ระหว่าง 3-365 วัน');
+      return;
+    }
+
     // Create contract with the customer ID (either existing or newly created)
     const contractPayload = {
       customerId: customerId,
@@ -375,13 +402,13 @@ export default function PawnEntryPage() {
         condition: parseInt(itemData.condition),
         defects: itemData.defects,
         note: itemData.note,
-        images: []
+        images: itemImages
       },
       pawnDetails: {
         aiEstimatedPrice: pawnDetails.aiEstimatedPrice,
-        pawnedPrice: parseFloat(pawnDetails.pawnedPrice),
+        pawnedPrice: pawnedPrice,
         interestRate: 10.0,
-        periodDays: parseInt(pawnDetails.periodDays)
+        periodDays: periodDays
       },
       storeId: selectedStoreId,
       createdBy: user._id,
@@ -402,7 +429,8 @@ export default function PawnEntryPage() {
 
     if (contractResponse.ok) {
       const result = await contractResponse.json();
-      alert(`สร้างสัญญาสำเร็จ! เลขที่สัญญา: ${result.contractNumber}`);
+      const customerMsg = selectedCustomer ? '' : ' และข้อมูลลูกค้าใหม่';
+      alert(`สร้างสัญญา${customerMsg}สำเร็จ! เลขที่สัญญา: ${result.contractNumber}`);
 
       // Reset forms
       setSelectedCustomer(null);
@@ -436,6 +464,7 @@ export default function PawnEntryPage() {
         pawnedPrice: '',
         periodDays: ''
       });
+      setItemImages([]);
 
       setShowContractPreview(false);
       router.push('/contracts');
@@ -580,6 +609,68 @@ export default function PawnEntryPage() {
       setNewType('');
       setShowAddType(false);
     }
+  };
+
+  // Handle item image upload
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingImages(true);
+
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      const uploadPromises = Array.from(files).map(async (file) => {
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`File ${file.name} is not an image`);
+        }
+
+        // Validate file size (max 5MB per image)
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is too large (max 5MB)`);
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'item');
+        formData.append('storeId', selectedStoreId);
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to upload ${file.name}`);
+        }
+
+        const data = await response.json();
+        return data.url;
+      });
+
+      const uploadedUrls = await Promise.all(uploadPromises);
+      setItemImages(prev => [...prev, ...uploadedUrls]);
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUploadingImages(false);
+      // Reset input
+      event.target.value = '';
+    }
+  };
+
+  // Remove item image
+  const removeImage = (index: number) => {
+    setItemImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const TitleBadge = ({ text }: { text: string }) => (
@@ -1282,6 +1373,79 @@ export default function PawnEntryPage() {
                 </div>
               </div>
 
+              {/* Item Images */}
+              <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200">
+                <div className="flex items-center gap-1 mb-1">
+                  <h2 className="text-xl font-semibold">Item Images</h2>
+                  <TitleBadge text="รูปภาพสินค้า" />
+                </div>
+                <p className="text-sm text-gray-600 mb-4">อัพโหลดรูปภาพของสินค้า (สูงสุด 10 รูป)</p>
+
+                {/* Upload Area */}
+                <div className="mb-4">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      {uploadingImages ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                          <p className="text-sm text-gray-500">กำลังอัพโหลด...</p>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 mb-2 text-gray-500" />
+                          <p className="mb-1 text-sm text-gray-500">
+                            <span className="font-semibold">คลิกเพื่ออัพโหลด</span> หรือลากไฟล์มาวาง
+                          </p>
+                          <p className="text-xs text-gray-500">PNG, JPG, GIF (สูงสุด 5MB ต่อไฟล์)</p>
+                        </>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploadingImages}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Image Gallery */}
+                {itemImages.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {itemImages.map((imageUrl, index) => (
+                      <div key={index} className="relative group">
+                        <div className="aspect-square rounded-lg overflow-hidden border border-gray-300 bg-gray-100">
+                          <img
+                            src={imageUrl}
+                            alt={`Item ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeImage(index)}
+                          className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          title="ลบรูปภาพ"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                        <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                          {index + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {itemImages.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Image className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">ยังไม่มีรูปภาพสินค้า</p>
+                  </div>
+                )}
+              </div>
+
               {/* Pawn Details */}
               <div className="bg-[#F5F4F2] rounded-2xl p-4 border border-gray-200 space-y-4">
                 <div className="flex items-center gap-1 mb-1">
@@ -1421,9 +1585,16 @@ export default function PawnEntryPage() {
           {/* Customer Information */}
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-1 mb-1">
-              <h2 className="text-xl font-semibold">Customer information</h2>
-              <TitleBadge text="ข้อมูลลูกค้า" />
+              <h2 className="text-xl font-semibold">
+                {selectedCustomer ? 'Customer information' : 'New Customer Registration'}
+              </h2>
+              <TitleBadge text={selectedCustomer ? 'ข้อมูลลูกค้า' : 'ลงทะเบียนลูกค้าใหม่'} />
             </div>
+            {!selectedCustomer && (
+              <p className="text-sm text-gray-600 mb-4">
+                กรอกข้อมูลลูกค้าใหม่ หรือเลือกจากรายชื่อที่มีอยู่ด้านบน
+              </p>
+            )}
             <div className="space-y-3">
               <div>
                 <div className="text-sm font-medium text-gray-700">Full name</div>
@@ -1498,6 +1669,29 @@ export default function PawnEntryPage() {
                   </div>
                 )}
               </div>
+
+              {/* Item Images */}
+              {itemImages.length > 0 && (
+                <div className="mt-4">
+                  <span className="text-sm text-gray-600 block mb-2">รูปภาพสินค้า ({itemImages.length} รูป)</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {itemImages.slice(0, 4).map((imageUrl, index) => (
+                      <div key={index} className="aspect-square rounded-lg overflow-hidden border border-gray-300 bg-gray-100">
+                        <img
+                          src={imageUrl}
+                          alt={`Item ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                    {itemImages.length > 4 && (
+                      <div className="aspect-square rounded-lg border border-gray-300 bg-gray-100 flex items-center justify-center">
+                        <span className="text-sm text-gray-500">+{itemImages.length - 4}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
