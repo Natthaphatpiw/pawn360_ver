@@ -15,6 +15,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
+import InterestPresetSettings from '@/components/settings/InterestPresetSettings';
 
 const sarabun = Sarabun({
   subsets: ['latin','thai'],
@@ -35,13 +36,26 @@ interface StoreData {
   };
   phone: string;
   taxId: string;
-  logoUrl?: string;
-  stampUrl?: string;
-  signatureUrl?: string;
+  googlemap: string;
+  bankUrl: string;
+  interestPerday: number;
+  interestSet: { [key: string]: number };
   interestPresets: {
     days: number;
     rate: number;
   }[];
+  contractTemplate: {
+    header: string;
+    footer: string;
+    terms: string;
+  };
+  delayed: {
+    maxday: number;
+    feeperday: number;
+  };
+  logoUrl?: string;
+  stampUrl?: string;
+  signatureUrl?: string;
 }
 
 export default function AccountPage() {
@@ -72,11 +86,28 @@ export default function AccountPage() {
     },
     phone: '',
     taxId: '',
+    googlemap: '',
+    bankUrl: '',
+    interestPerday: 0.025,
+    interestSet: {
+      '7': 0.07,
+      '14': 0.08,
+      '30': 0.10
+    },
     interestPresets: [
-      { days: 7, rate: 3.0 },
-      { days: 15, rate: 5.0 },
-      { days: 30, rate: 10.0 }
-    ]
+      { days: 7, rate: 3 },
+      { days: 15, rate: 5 },
+      { days: 30, rate: 10 }
+    ],
+    contractTemplate: {
+      header: 'สัญญาจำนำทองคำ',
+      footer: 'ขอบคุณที่ใช้บริการ',
+      terms: 'เงื่อนไขการจำนำมาตรฐาน'
+    },
+    delayed: {
+      maxday: 7,
+      feeperday: 100
+    }
   });
 
   // Close dropdown when clicking outside
@@ -180,7 +211,14 @@ export default function AccountPage() {
         store_name: newStoreData.storeName,
         address: newStoreData.address,
         phone: newStoreData.phone,
-        tax_id: newStoreData.taxId
+        tax_id: newStoreData.taxId,
+        googlemap: newStoreData.googlemap,
+        bankUrl: newStoreData.bankUrl,
+        interestPerday: newStoreData.interestPerday,
+        interestSet: newStoreData.interestSet,
+        interestPresets: newStoreData.interestPresets,
+        contractTemplate: newStoreData.contractTemplate,
+        delayed: newStoreData.delayed
       };
 
         const response = await fetch('/api/stores', {
@@ -210,11 +248,28 @@ export default function AccountPage() {
           },
           phone: '',
           taxId: '',
+          googlemap: '',
+          bankUrl: '',
+          interestPerday: 0.025,
+          interestSet: {
+            '7': 0.07,
+            '14': 0.08,
+            '30': 0.10
+          },
           interestPresets: [
-            { days: 7, rate: 3.0 },
-            { days: 15, rate: 5.0 },
-            { days: 30, rate: 10.0 }
-          ]
+            { days: 7, rate: 3 },
+            { days: 15, rate: 5 },
+            { days: 30, rate: 10 }
+          ],
+          contractTemplate: {
+            header: 'สัญญาจำนำทองคำ',
+            footer: 'ขอบคุณที่ใช้บริการ',
+            terms: 'เงื่อนไขการจำนำมาตรฐาน'
+          },
+          delayed: {
+            maxday: 7,
+            feeperday: 100
+          }
         });
         alert('Store created successfully!');
       } else {
@@ -242,6 +297,33 @@ export default function AccountPage() {
         [field]: value
       }));
     }
+  };
+
+  const handleInterestPresetsChange = (presets: {days: number, rate: number}[]) => {
+    setNewStoreData(prev => ({
+      ...prev,
+      interestPresets: presets
+    }));
+  };
+
+  const handleMaxLateDaysChange = (days: number) => {
+    setNewStoreData(prev => ({
+      ...prev,
+      delayed: {
+        ...prev.delayed,
+        maxday: days
+      }
+    }));
+  };
+
+  const handleTemplateNameChange = (name: string) => {
+    setNewStoreData(prev => ({
+      ...prev,
+      contractTemplate: {
+        ...prev.contractTemplate,
+        header: name
+      }
+    }));
   };
 
   const TitleBadge = ({ text }: { text: string }) => (
@@ -711,6 +793,60 @@ export default function AccountPage() {
                 />
               </div>
 
+              {/* Google Maps URL */}
+              <div>
+                <label className="text-sm font-medium text-gray-900 block mb-2">Google Maps URL</label>
+                <input
+                  type="url"
+                  value={newStoreData.googlemap}
+                  onChange={(e) => handleNewStoreDataChange('googlemap', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="https://maps.app.goo.gl/..."
+                />
+              </div>
+
+              {/* Daily Interest Rate */}
+              <div>
+                <label className="text-sm font-medium text-gray-900 block mb-2">Daily Interest Rate (%)</label>
+                <input
+                  type="number"
+                  value={newStoreData.interestPerday}
+                  onChange={(e) => handleNewStoreDataChange('interestPerday', parseFloat(e.target.value) || 0)}
+                  step="0.001"
+                  min="0"
+                  max="1"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="0.025"
+                />
+              </div>
+
+              {/* Max Late Days */}
+              <div>
+                <label className="text-sm font-medium text-gray-900 block mb-2">Maximum Late Days</label>
+                <input
+                  type="number"
+                  value={newStoreData.delayed.maxday}
+                  onChange={(e) => handleNewStoreDataChange('delayed.maxday', parseInt(e.target.value) || 0)}
+                  min="0"
+                  max="365"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="7"
+                />
+              </div>
+
+              {/* Late Fee Per Day */}
+              <div>
+                <label className="text-sm font-medium text-gray-900 block mb-2">Late Fee Per Day (฿)</label>
+                <input
+                  type="number"
+                  value={newStoreData.delayed.feeperday}
+                  onChange={(e) => handleNewStoreDataChange('delayed.feeperday', parseFloat(e.target.value) || 0)}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="100"
+                />
+              </div>
+
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-900 block mb-2">House Number</label>
@@ -798,6 +934,20 @@ export default function AccountPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Interest Preset Settings */}
+            <div className="mt-8">
+              <InterestPresetSettings
+                interestPresets={newStoreData.interestPresets}
+                maxLateDays={newStoreData.delayed.maxday}
+                templateName={newStoreData.contractTemplate.header}
+                dailyInterestRate={newStoreData.interestPerday}
+                onInterestPresetsChange={handleInterestPresetsChange}
+                onMaxLateDaysChange={handleMaxLateDaysChange}
+                onTemplateNameChange={handleTemplateNameChange}
+                onDailyInterestRateChange={(rate) => handleNewStoreDataChange('interestPerday', rate)}
+              />
             </div>
 
             <div className="flex justify-end gap-3 mt-6">

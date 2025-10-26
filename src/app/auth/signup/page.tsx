@@ -411,9 +411,14 @@ export default function SignUpPage() {
                   interestPresets={formData.interestPresets}
                   maxLateDays={formData.delayed.maxday}
                   templateName={formData.contractTemplate.header}
+                  dailyInterestRate={formData.interestPerday}
                   onInterestPresetsChange={handleInterestPresetsChange}
                   onMaxLateDaysChange={handleMaxLateDaysChange}
                   onTemplateNameChange={handleTemplateNameChange}
+                  onDailyInterestRateChange={(rate) => setFormData(prev => ({
+                    ...prev,
+                    interestPerday: rate
+                  }))}
                 />
               </div>
 
