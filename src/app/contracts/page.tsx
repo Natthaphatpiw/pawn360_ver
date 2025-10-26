@@ -22,7 +22,8 @@ import {
   ChevronDown,
   ChevronUp,
   MoreHorizontal,
-  X
+  X,
+  Edit
 } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
 const sarabun = Sarabun({
@@ -33,7 +34,7 @@ const sarabun = Sarabun({
 interface Contract {
   _id: string;
   contractNumber: string;
-  customerId: string;
+  status: string;
   customer: {
     fullName: string;
     phone: string;
@@ -42,6 +43,7 @@ interface Contract {
   pawnDetails: {
     pawnedPrice: number;
     interestRate: number;
+    periodDays: number;
     totalInterest: number;
     remainingAmount: number;
   };
@@ -54,14 +56,10 @@ interface Contract {
     images: string[];
   };
   dates: {
-    contractDate: string;
-    dueDate: string;
-    redeemDate?: string;
-    suspendedDate?: string;
+    createdAt: string;
+    updatedAt: string;
+    dueDate?: string;
   };
-  status: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export default function ContractsPage() {
@@ -82,7 +80,7 @@ export default function ContractsPage() {
   const [userStores, setUserStores] = useState<any[]>([]);
 
   // Sorting state - default sort by date (newest first)
-  const [sortState, setSortState] = useState({ field: 'dueDate', order: 'default' });
+  const [sortState, setSortState] = useState({ field: 'createdAt', order: 'default' });
 
   // Fetch user stores and contracts
   useEffect(() => {
@@ -129,40 +127,6 @@ export default function ContractsPage() {
 
   // Fetch contracts when store selection changes
   useEffect(() => {
-    const fetchContracts = async () => {
-      if (userStores.length === 0) return;
-
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('access_token');
-        if (!token) return;
-
-        let allContracts: Contract[] = [];
-
-        // Fetch contracts from selected stores
-        for (const storeId of selectedStoreIds) {
-          const response = await fetch(`/api/contracts?storeId=${storeId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (response.ok) {
-            const storeContracts = await response.json();
-            allContracts = [...allContracts, ...storeContracts];
-          }
-        }
-
-        setContracts(allContracts);
-      } catch (err) {
-        console.error('Error fetching contracts:', err);
-        setError('Failed to load contracts');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchContracts();
   }, [selectedStoreIds, userStores]);
 
@@ -316,11 +280,87 @@ export default function ContractsPage() {
     </div>
   );
 
+  // Fetch contracts from selected stores
+  const fetchContracts = async () => {
+    if (userStores.length === 0) return;
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      let allContracts: Contract[] = [];
+
+      // Fetch contracts from selected stores
+      for (const storeId of selectedStoreIds) {
+        const response = await fetch(`/api/contracts?storeId=${storeId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const storeContracts = await response.json();
+          allContracts = [...allContracts, ...storeContracts];
+        }
+      }
+
+      setContracts(allContracts);
+    } catch (err) {
+      console.error('Error fetching contracts:', err);
+      setError('Failed to load contracts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle contract actions (approve, reject, modify)
+  const handleContractAction = async (contractId: string, action: string) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    let modifications = null;
+    if (action === 'reject') {
+      const reason = prompt('กรุณาระบุเหตุผลในการปฏิเสธ:');
+      if (!reason) return;
+      modifications = { reason };
+    }
+
+    try {
+      const response = await fetch(`/api/contracts/${contractId}/actions`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action, modifications })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(result.message);
+
+        // Refresh contracts list
+        fetchContracts();
+      } else {
+        const errorData = await response.json();
+        alert(`เกิดข้อผิดพลาด: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Contract action error:', error);
+      alert('เกิดข้อผิดพลาดในการดำเนินการ');
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Active' },
+      pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'รออนุมัติ' },
       overdue: { bg: 'bg-red-100', text: 'text-red-800', label: 'Overdue' },
       suspended: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Suspended' },
+      rejected: { bg: 'bg-red-100', text: 'text-red-800', label: 'ถูกปฏิเสธ' },
+      cancelled: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'ยกเลิก' },
       sold: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Sold' },
       redeemed: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Redeemed' },
     };
@@ -343,8 +383,8 @@ export default function ContractsPage() {
     // Filter by selected dates (check if contract due date matches any selected date)
     const matchesDate = selectedDates.length === 0 || selectedDates.some(selectedDate => {
       try {
-        const contractDueDate = new Date(contract.dates.dueDate);
-        return isSameDate(contractDueDate, selectedDate);
+        const contractDate = new Date(contract.dates.createdAt);
+        return isSameDate(contractDate, selectedDate);
       } catch (error) {
         return false;
       }
@@ -373,11 +413,11 @@ export default function ContractsPage() {
 
   const sortContracts = (contracts: Contract[]) => {
     // Apply default sorting if no explicit sort is set
-    if (sortState.order === 'default' && sortState.field === 'dueDate') {
-      // Default: sort by dueDate descending (newest first)
+    if (sortState.order === 'default' && sortState.field === 'createdAt') {
+      // Default: sort by createdAt descending (newest first)
       return [...contracts].sort((a, b) => {
-        const aDate = new Date(a.dates.dueDate).getTime();
-        const bDate = new Date(b.dates.dueDate).getTime();
+        const aDate = new Date(a.dates.createdAt).getTime();
+        const bDate = new Date(b.dates.createdAt).getTime();
         return bDate - aDate; // Descending order
       });
     }
@@ -405,9 +445,9 @@ export default function ContractsPage() {
           aValue = a.status;
           bValue = b.status;
           break;
-        case 'dueDate':
-          aValue = new Date(a.dates.dueDate).getTime();
-          bValue = new Date(b.dates.dueDate).getTime();
+        case 'createdAt':
+          aValue = new Date(a.dates.createdAt).getTime();
+          bValue = new Date(b.dates.createdAt).getTime();
           break;
         default:
           return 0;
@@ -587,8 +627,8 @@ export default function ContractsPage() {
                       </th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">
                         <div className="flex items-center">
-                          Due Date
-                          <SortButton field="dueDate" />
+                          Date
+                          <SortButton field="createdAt" />
                         </div>
                       </th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-gray-700"></th>
@@ -634,19 +674,47 @@ export default function ContractsPage() {
                             {getStatusBadge(contract.status)}
                           </td>
                           <td className="py-3 px-4">
-                            <div className="text-gray-900 text-sm">{new Date(contract.dates.dueDate).toLocaleDateString()}</div>
+                            <div className="text-gray-900 text-sm">{new Date(contract.dates.createdAt).toLocaleDateString()}</div>
                           </td>
                           <td className="py-3 px-4">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/contracts/${contract._id}`);
-                              }}
-                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                              title="View contract details"
-                            >
-                              <Eye size={16} className="text-gray-500" />
-                            </button>
+                            <div className="flex items-center space-x-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/contracts/${contract._id}`);
+                                }}
+                                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                                title="View contract details"
+                              >
+                                <Eye size={16} className="text-gray-500" />
+                              </button>
+
+                              {contract.status === 'pending' && (
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleContractAction(contract._id, 'approve');
+                                    }}
+                                    className="p-2 hover:bg-green-200 rounded-lg transition-colors"
+                                    title="อนุมัติสัญญา"
+                                  >
+                                    <CheckCircle2 size={16} className="text-green-500" />
+                                  </button>
+
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleContractAction(contract._id, 'reject');
+                                    }}
+                                    className="p-2 hover:bg-red-200 rounded-lg transition-colors"
+                                    title="ปฏิเสธสัญญา"
+                                  >
+                                    <XCircle size={16} className="text-red-500" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -861,6 +929,10 @@ export default function ContractsPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Active</span>
                 <span className="font-medium text-green-600">{contracts.filter(c => c.status === 'active').length}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">รออนุมัติ</span>
+                <span className="font-medium text-yellow-600">{contracts.filter(c => c.status === 'pending').length}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Overdue</span>

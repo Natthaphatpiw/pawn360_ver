@@ -390,29 +390,29 @@ export default function PawnEntryPage() {
       return;
     }
 
-    // Create contract with the customer ID (either existing or newly created)
+    // Create item with LINE integration data
     const contractPayload = {
-      customerId: customerId,
-      item: {
-        brand: itemData.brand,
-        model: itemData.model,
-        type: itemData.type,
-        serialNo: itemData.serialNo,
-        accessories: itemData.accessories,
-        condition: parseInt(itemData.condition),
-        defects: itemData.defects,
-        note: itemData.note,
-        images: itemImages
-      },
+      lineId: selectedCustomer?.phone || customerData.phoneNumber || '', // Use customer phone as lineId
+      brand: itemData.brand,
+      model: itemData.model,
+      type: itemData.type,
+      serialNo: itemData.serialNo,
+      condition: parseInt(itemData.condition),
+      defects: itemData.defects,
+      note: itemData.note,
+      accessories: itemData.accessories,
+      images: itemImages,
+      desiredAmount: pawnedPrice,
+      estimatedValue: pawnDetails.aiEstimatedPrice || pawnedPrice,
+      loanDays: periodDays,
+      interestRate: 10.0, // Default interest rate
       pawnDetails: {
         aiEstimatedPrice: pawnDetails.aiEstimatedPrice,
         pawnedPrice: pawnedPrice,
         interestRate: 10.0,
         periodDays: periodDays
       },
-      storeId: selectedStoreId,
-      createdBy: user._id,
-      paymentMethod: 'cash'
+      storeId: selectedStoreId
     };
 
     console.log('Creating contract with payload:', contractPayload);
@@ -430,7 +430,7 @@ export default function PawnEntryPage() {
     if (contractResponse.ok) {
       const result = await contractResponse.json();
       const customerMsg = selectedCustomer ? '' : ' และข้อมูลลูกค้าใหม่';
-      alert(`สร้างสัญญา${customerMsg}สำเร็จ! เลขที่สัญญา: ${result.contractNumber}`);
+      alert(`ส่งข้อมูลสินค้า${customerMsg}สำเร็จ! รอการอนุมัติจากร้านค้า`);
 
       // Reset forms
       setSelectedCustomer(null);

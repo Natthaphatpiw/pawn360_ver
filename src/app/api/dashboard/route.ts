@@ -20,25 +20,38 @@ export async function GET(request: NextRequest) {
 
     const storeObjectId = new ObjectId(storeId);
 
-    // Count statistics matching FastAPI dashboard/stats endpoint
+    // Count statistics from items collection
     const totalCustomers = await db.collection('customers').countDocuments({ storeId: storeObjectId });
-    const totalContracts = await db.collection('contracts').countDocuments({ storeId: storeObjectId });
-    const activeContracts = await db.collection('contracts').countDocuments({ storeId: storeObjectId, status: 'active' });
-    const overdueContracts = await db.collection('contracts').countDocuments({ storeId: storeObjectId, status: 'overdue' });
 
-    // Calculate total pawned value for active and overdue contracts
-    const valuePipeline = [
-      { $match: { storeId: storeObjectId, status: { $in: ['active', 'overdue'] } } },
-      { $group: { _id: null, total_value: { $sum: '$pawnDetails.pawnedPrice' } } }
-    ];
-    const valueResult = await db.collection('contracts').aggregate(valuePipeline).toArray();
-    const totalPawnedValue = valueResult.length > 0 ? valueResult[0].total_value : 0;
+    // Count items by status
+    const totalItems = await db.collection('items').countDocuments({ storeId: storeObjectId });
+    const activeItems = await db.collection('items').countDocuments({ storeId: storeObjectId, status: 'active' });
+    const pendingItems = await db.collection('items').countDocuments({ storeId: storeObjectId, status: 'pending' });
+    const overdueItems = await db.collection('items').countDocuments({ storeId: storeObjectId, status: 'overdue' });
+
+    // Calculate total pawned value from items
+    const items = await db.collection('items').find({
+      storeId: storeObjectId,
+      status: { $in: ['active', 'pending', 'overdue'] }
+    }).toArray();
+
+    let totalPawnedValue = 0;
+    for (const item of items) {
+      if (item.status === 'active' && item.confirmationNewContract) {
+        // Use confirmed contract price for active items
+        totalPawnedValue += item.confirmationNewContract.pawnPrice || 0;
+      } else if (item.status === 'pending') {
+        // Use desired or estimated value for pending items
+        totalPawnedValue += item.desiredAmount || item.estimatedValue || 0;
+      }
+    }
 
     return NextResponse.json({
       total_customers: totalCustomers,
-      total_contracts: totalContracts,
-      active_contracts: activeContracts,
-      overdue_contracts: overdueContracts,
+      total_contracts: activeItems, // Active contracts are items with status 'active'
+      active_contracts: activeItems,
+      pending_contracts: pendingItems,
+      overdue_contracts: overdueItems,
       total_pawned_value: totalPawnedValue
     });
   } catch (error) {

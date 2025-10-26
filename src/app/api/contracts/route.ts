@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
       query.status = status;
     }
 
-    const contracts = await db.collection('contracts').find(query).toArray();
+    // Fetch items instead of contracts
+    const items = await db.collection('items').find(query).sort({ createdAt: -1 }).toArray();
 
     // Helper function to convert ObjectIds and datetimes
     function convertObjectIds(obj: any): any {
@@ -50,46 +51,104 @@ export async function GET(request: NextRequest) {
     }
 
     // Convert to frontend format
-    const convertedContracts = [];
-    for (const contract of contracts) {
+    const convertedItems = [];
+    for (const item of items) {
       // First, convert all ObjectIds to strings
-      const convertedContract = convertObjectIds(contract);
+      const convertedItem = convertObjectIds(item);
 
-      // Get customer info (using string ID now)
-      const customer = await db.collection('customers').findOne({ "_id": new ObjectId(convertedContract["customerId"]) });
-      if (customer) {
-        convertedContract["customer"] = {
-          "fullName": customer.fullName || "",
-          "phone": customer.phone || "",
-          "idNumber": customer.idNumber || ""
-        };
-      } else {
-        // Fallback if customer not found
-        convertedContract["customer"] = {
-          "fullName": "ลูกค้าไม่ทราบชื่อ",
-          "phone": "",
+      // Try to get customer info from lineId (if available)
+      let customerInfo = null;
+      if (convertedItem.lineId) {
+        // Look for customer with matching lineId or create placeholder
+        const customer = await db.collection('customers').findOne({
+          $or: [
+            { lineId: convertedItem.lineId },
+            { phone: convertedItem.lineId } // fallback
+          ]
+        });
+        if (customer) {
+          customerInfo = {
+            "fullName": customer.fullName || "",
+            "phone": customer.phone || "",
+            "idNumber": customer.idNumber || ""
+          };
+        }
+      }
+
+      if (!customerInfo) {
+        // Fallback customer info
+        customerInfo = {
+          "fullName": "ลูกค้าผ่าน LINE",
+          "phone": convertedItem.lineId || "",
           "idNumber": ""
         };
       }
 
-      // Ensure pawnDetails has correct structure with all fields
-      if ("pawnDetails" in convertedContract) {
-        const pawnDetails = convertedContract["pawnDetails"];
-        convertedContract["pawnDetails"] = {
-          "pawnedPrice": pawnDetails.pawnedPrice || 0,
-          "interestRate": pawnDetails.interestRate || 0,
-          "totalInterest": pawnDetails.totalInterest || 0,
-          "remainingAmount": pawnDetails.remainingAmount || 0,
-          "payInterest": pawnDetails.payInterest || 0,
-          "fineAmount": pawnDetails.fineAmount || 0,
-          "soldAmount": pawnDetails.soldAmount || 0
+      // Create contract-like structure from item data
+      const contractData = {
+        _id: convertedItem._id,
+        contractNumber: convertedItem.currentContractId ?
+          `CONTRACT-${convertedItem.currentContractId.substring(0, 8).toUpperCase()}` :
+          `PENDING-${convertedItem._id.substring(0, 8).toUpperCase()}`,
+        status: convertedItem.status || 'pending',
+        customer: customerInfo,
+        item: {
+          brand: convertedItem.brand || '',
+          model: convertedItem.model || '',
+          type: convertedItem.type || '',
+          serialNo: convertedItem.serialNo || '',
+          accessories: convertedItem.accessories || '',
+          condition: convertedItem.condition || 0,
+          defects: convertedItem.defects || '',
+          note: convertedItem.note || '',
+          images: convertedItem.images || []
+        },
+        pawnDetails: {},
+        dates: {
+          createdAt: convertedItem.createdAt,
+          updatedAt: convertedItem.updatedAt
+        },
+        storeId: convertedItem.storeId,
+        confirmationStatus: convertedItem.confirmationStatus || 'pending'
+      };
+
+      // Calculate pawn details based on status and confirmation data
+      if (convertedItem.status === 'active' && convertedItem.confirmationNewContract) {
+        // Use confirmed contract data for active items
+        const confirmed = convertedItem.confirmationNewContract;
+        contractData.pawnDetails = {
+          pawnedPrice: confirmed.pawnPrice || 0,
+          interestRate: confirmed.interestRate || 0,
+          periodDays: confirmed.loanDays || 0,
+          totalInterest: confirmed.interest || 0,
+          remainingAmount: confirmed.total || 0,
+          payInterest: 0,
+          fineAmount: 0,
+          soldAmount: 0
+        };
+      } else {
+        // Use desired/estimated values for pending items
+        const pawnPrice = convertedItem.desiredAmount || convertedItem.estimatedValue || 0;
+        const interestRate = convertedItem.interestRate || 10;
+        const loanDays = convertedItem.loanDays || 30;
+        const totalInterest = Math.round(pawnPrice * (interestRate / 100) * (loanDays / 30) * 100) / 100;
+
+        contractData.pawnDetails = {
+          pawnedPrice: pawnPrice,
+          interestRate: interestRate,
+          periodDays: loanDays,
+          totalInterest: totalInterest,
+          remainingAmount: pawnPrice + totalInterest,
+          payInterest: 0,
+          fineAmount: 0,
+          soldAmount: 0
         };
       }
 
-      convertedContracts.push(convertedContract);
+      convertedItems.push(contractData);
     }
 
-    return NextResponse.json(convertedContracts);
+    return NextResponse.json(convertedItems);
   } catch (error) {
     console.error('Contracts API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -106,83 +165,278 @@ export async function POST(request: NextRequest) {
     const db = await getDatabase();
     const contractData = await request.json();
 
-    // Generate contract number
     const startDate = new Date();
-    const periodDays = contractData.pawnDetails?.periodDays || 90;
-    const dueDate = new Date(startDate);
-    dueDate.setDate(dueDate.getDate() + periodDays);
 
-    // Calculate interest and total amount
-    const pawnedPrice = contractData.pawnDetails?.pawnedPrice || 0;
-    const interestRate = contractData.pawnDetails?.interestRate || 10.0;
-    const totalInterest = Math.round(pawnedPrice * (interestRate / 100) * (periodDays / 30) * 100) / 100;
-    const remainingAmount = pawnedPrice + totalInterest;
-
-    // Generate contract number
-    const timestamp = startDate.toISOString().slice(0, 10).replace(/-/g, '');
-    const randomPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    const contractNumber = `STORE${timestamp}${randomPart}`;
-
-    const contractDoc = {
-      contractNumber,
-      status: 'active',
-      customerId: new ObjectId(contractData.customerId),
-      item: {
-        brand: contractData.item?.brand || '',
-        model: contractData.item?.model || '',
-        type: contractData.item?.type || '',
-        serialNo: contractData.item?.serialNo || '',
-        accessories: contractData.item?.accessories || '',
-        condition: contractData.item?.condition || 0,
-        defects: contractData.item?.defects || '',
-        note: contractData.item?.note || '',
-        images: contractData.item?.images || []
-      },
-      pawnDetails: {
-        aiEstimatedPrice: contractData.pawnDetails?.aiEstimatedPrice || 0,
-        pawnedPrice,
-        interestRate,
-        periodDays,
-        totalInterest,
-        remainingAmount,
-        payInterest: 0,
-        fineAmount: 0,
-        soldAmount: 0
-      },
-      dates: {
-        startDate,
-        dueDate,
-        redeemDate: null,
-        suspendedDate: null
-      },
-      transactionHistory: [],
+    // Create item document in items collection
+    const itemDoc = {
+      lineId: contractData.lineId || '', // From LINE integration
+      brand: contractData.item?.brand || '',
+      model: contractData.item?.model || '',
+      type: contractData.item?.type || '',
+      serialNo: contractData.item?.serialNo || '',
+      condition: contractData.item?.condition || 50,
+      defects: contractData.item?.defects || '',
+      note: contractData.item?.note || '',
+      accessories: contractData.item?.accessories || '',
+      images: contractData.item?.images || [],
+      status: 'pending', // Start as pending, will be confirmed later
+      currentContractId: null,
+      contractHistory: [],
+      desiredAmount: contractData.pawnDetails?.pawnedPrice || contractData.pawnDetails?.aiEstimatedPrice || 0,
+      estimatedValue: contractData.pawnDetails?.aiEstimatedPrice || contractData.pawnDetails?.pawnedPrice || 0,
+      loanDays: contractData.pawnDetails?.periodDays || 30,
+      interestRate: contractData.pawnDetails?.interestRate || 10,
       storeId: new ObjectId(contractData.storeId),
-      createdBy: new ObjectId(userId),
-      userId: new ObjectId(userId),
+      negotiationStatus: 'none',
       createdAt: startDate,
-      updatedAt: startDate
+      updatedAt: startDate,
+      confirmationModifications: [],
+      confirmationNewContract: {
+        itemId: '', // Will be set after insertion
+        pawnPrice: contractData.pawnDetails?.pawnedPrice || 0,
+        interestRate: contractData.pawnDetails?.interestRate || 10,
+        loanDays: contractData.pawnDetails?.periodDays || 30,
+        interest: 0, // Will be calculated during confirmation
+        total: 0, // Will be calculated during confirmation
+        item: `${contractData.item?.brand || ''} ${contractData.item?.model || ''}`.trim()
+      },
+      confirmationStatus: 'pending',
+      confirmationTimestamp: null
     };
 
-    const result = await db.collection('contracts').insertOne(contractDoc);
-    const contractId = result.insertedId.toString();
+    // Insert item
+    const result = await db.collection('items').insertOne(itemDoc);
+    const itemId = result.insertedId;
 
-    // Update customer: add contract ID to contractsID array and update stats
-    await db.collection('customers').updateOne(
-      { "_id": new ObjectId(contractData.customerId) },
+    // Update confirmationNewContract with itemId
+    await db.collection('items').updateOne(
+      { _id: itemId },
       {
-        $push: { contractsID: contractId },
-        $inc: { totalContracts: 1, totalValue: pawnedPrice },
-        $set: { lastContractDate: startDate, updatedAt: new Date() }
-      } as any
+        $set: {
+          'confirmationNewContract.itemId': itemId.toString(),
+          updatedAt: new Date()
+        }
+      }
     );
 
     return NextResponse.json({
-      message: 'Contract created successfully',
-      contract_id: contractId,
-      contract_number: contractNumber
+      message: 'Item created successfully',
+      item_id: itemId.toString(),
+      status: 'pending'
     });
   } catch (error) {
-    console.error('Create contract error:', error);
+    console.error('Create item error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// PUT /api/contracts/[id]/actions - Handle contract actions (approve, reject, etc.)
+export async function PUT(request: NextRequest) {
+  try {
+    const userId = getUserIdFromToken(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    const contractId = url.pathname.split('/')[3]; // Extract ID from /api/contracts/[id]/actions
+
+    if (!contractId) {
+      return NextResponse.json({ error: 'Contract ID is required' }, { status: 400 });
+    }
+
+    const db = await getDatabase();
+    const actionData = await request.json();
+    const { action, modifications } = actionData;
+
+    // Find the item
+    const item = await db.collection('items').findOne({ _id: new ObjectId(contractId) });
+    if (!item) {
+      return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+    }
+
+    const currentTime = new Date();
+
+    if (action === 'approve' || action === 'confirm') {
+      // Calculate final amounts
+      const confirmedData = item.confirmationNewContract;
+      const pawnPrice = confirmedData.pawnPrice;
+      const interestRate = confirmedData.interestRate;
+      const loanDays = confirmedData.loanDays;
+
+      // Calculate interest: (pawnPrice * interestRate% * loanDays/30)
+      const interest = Math.round(pawnPrice * (interestRate / 100) * (loanDays / 30) * 100) / 100;
+      const total = pawnPrice + interest;
+
+      // Generate contract number
+      const timestamp = currentTime.toISOString().slice(0, 10).replace(/-/g, '');
+      const randomPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      const contractNumber = `STORE${timestamp}${randomPart}`;
+
+      // Create actual contract document
+      const contractDoc = {
+        contractNumber,
+        status: 'active',
+        itemId: item._id,
+        customerInfo: {
+          lineId: item.lineId,
+          contact: item.lineId // For now, use lineId as contact
+        },
+        item: {
+          brand: item.brand,
+          model: item.model,
+          type: item.type,
+          serialNo: item.serialNo,
+          accessories: item.accessories,
+          condition: item.condition,
+          defects: item.defects,
+          note: item.note,
+          images: item.images
+        },
+        pawnDetails: {
+          pawnPrice,
+          interestRate,
+          loanDays,
+          interest,
+          total,
+          paidInterest: 0,
+          fineAmount: 0,
+          remainingAmount: total
+        },
+        dates: {
+          startDate: currentTime,
+          dueDate: new Date(currentTime.getTime() + loanDays * 24 * 60 * 60 * 1000),
+          createdAt: currentTime,
+          updatedAt: currentTime
+        },
+        storeId: item.storeId,
+        createdBy: new ObjectId(userId),
+        transactionHistory: [{
+          type: 'contract_created',
+          amount: pawnPrice,
+          date: currentTime,
+          description: 'Contract created and approved'
+        }]
+      };
+
+      // Insert contract
+      const contractResult = await db.collection('contracts').insertOne(contractDoc);
+      const actualContractId = contractResult.insertedId;
+
+      // Update item with contract info
+      await db.collection('items').updateOne(
+        { _id: item._id },
+        {
+          $set: {
+            status: 'active',
+            currentContractId: actualContractId,
+            'confirmationNewContract.interest': interest,
+            'confirmationNewContract.total': total,
+            confirmationStatus: 'confirmed',
+            confirmationTimestamp: currentTime,
+            updatedAt: currentTime
+          },
+          $push: {
+            contractHistory: actualContractId,
+            confirmationModifications: {
+              action: 'approved',
+              timestamp: currentTime,
+              contractNumber,
+              finalAmount: total
+            }
+          } as any
+        }
+      );
+
+      return NextResponse.json({
+        message: 'Contract approved and created successfully',
+        contractNumber,
+        itemId: contractId,
+        status: 'active'
+      });
+
+    } else if (action === 'reject' || action === 'cancel') {
+      // Update item status to rejected/cancelled
+      const newStatus = action === 'reject' ? 'rejected' : 'cancelled';
+
+      await db.collection('items').updateOne(
+        { _id: item._id },
+        {
+          $set: {
+            status: newStatus,
+            confirmationStatus: 'cancelled',
+            updatedAt: currentTime
+          },
+          $push: {
+            confirmationModifications: {
+              action: newStatus,
+              timestamp: currentTime,
+              reason: modifications?.reason || 'No reason provided'
+            }
+          } as any
+        }
+      );
+
+      return NextResponse.json({
+        message: `Contract ${newStatus} successfully`,
+        itemId: contractId,
+        status: newStatus
+      });
+
+    } else if (action === 'modify') {
+      // Update contract terms
+      const updates: any = {
+        updatedAt: currentTime
+      };
+
+      if (modifications) {
+        if (modifications.pawnPrice !== undefined) {
+          updates['confirmationNewContract.pawnPrice'] = modifications.pawnPrice;
+          updates['confirmationModifications'] = item.confirmationModifications || [];
+          updates['confirmationModifications'].push({
+            action: 'price_modified',
+            oldValue: item.confirmationNewContract.pawnPrice,
+            newValue: modifications.pawnPrice,
+            timestamp: currentTime
+          });
+        }
+        if (modifications.interestRate !== undefined) {
+          updates['confirmationNewContract.interestRate'] = modifications.interestRate;
+          updates['confirmationModifications'] = item.confirmationModifications || [];
+          updates['confirmationModifications'].push({
+            action: 'interest_modified',
+            oldValue: item.confirmationNewContract.interestRate,
+            newValue: modifications.interestRate,
+            timestamp: currentTime
+          });
+        }
+        if (modifications.loanDays !== undefined) {
+          updates['confirmationNewContract.loanDays'] = modifications.loanDays;
+          updates['confirmationModifications'] = item.confirmationModifications || [];
+          updates['confirmationModifications'].push({
+            action: 'duration_modified',
+            oldValue: item.confirmationNewContract.loanDays,
+            newValue: modifications.loanDays,
+            timestamp: currentTime
+          });
+        }
+      }
+
+      await db.collection('items').updateOne(
+        { _id: item._id },
+        { $set: updates }
+      );
+
+      return NextResponse.json({
+        message: 'Contract modified successfully',
+        itemId: contractId
+      });
+    }
+
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+
+  } catch (error) {
+    console.error('Contract action error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
