@@ -10,29 +10,16 @@ interface InterestPreset {
 
 interface InterestPresetSettingsProps {
   interestPresets: InterestPreset[];
-  maxLateDays: number;
-  templateName: string;
-  dailyInterestRate?: number;
   onInterestPresetsChange: (presets: InterestPreset[]) => void;
-  onMaxLateDaysChange: (days: number) => void;
-  onTemplateNameChange: (name: string) => void;
-  onDailyInterestRateChange?: (rate: number) => void;
 }
 
 export default function InterestPresetSettings({
   interestPresets,
-  maxLateDays,
-  templateName,
-  dailyInterestRate = 0,
   onInterestPresetsChange,
-  onMaxLateDaysChange,
-  onTemplateNameChange,
-  onDailyInterestRateChange,
 }: InterestPresetSettingsProps) {
-  const [isDailyInterest, setIsDailyInterest] = useState(dailyInterestRate > 0);
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [localTemplateName, setLocalTemplateName] = useState(templateName);
-  const [localDailyInterestRate, setLocalDailyInterestRate] = useState(dailyInterestRate);
+  const [showAddPresetModal, setShowAddPresetModal] = useState(false);
+  const [newPresetDays, setNewPresetDays] = useState('');
+  const [newPresetRate, setNewPresetRate] = useState('');
 
   // Default presets if none provided
   const defaultPresets: InterestPreset[] = [
@@ -45,35 +32,30 @@ export default function InterestPresetSettings({
     interestPresets.length > 0 ? interestPresets : defaultPresets
   );
 
-  const [localMaxLateDays, setLocalMaxLateDays] = useState(maxLateDays || 7);
-
   useEffect(() => {
     onInterestPresetsChange(presets);
   }, [presets, onInterestPresetsChange]);
 
-  useEffect(() => {
-    onMaxLateDaysChange(localMaxLateDays);
-  }, [localMaxLateDays, onMaxLateDaysChange]);
+  const addPreset = () => {
+    setShowAddPresetModal(true);
+  };
 
-  useEffect(() => {
-    onTemplateNameChange(localTemplateName);
-  }, [localTemplateName, onTemplateNameChange]);
+  const handleAddPresetConfirm = () => {
+    const days = parseInt(newPresetDays);
+    const rate = parseFloat(newPresetRate);
 
-  useEffect(() => {
-    if (onDailyInterestRateChange) {
-      onDailyInterestRateChange(isDailyInterest ? localDailyInterestRate : 0);
-    }
-  }, [isDailyInterest, localDailyInterestRate, onDailyInterestRateChange]);
-
-  const handleDailyInterestToggle = (checked: boolean) => {
-    setIsDailyInterest(checked);
-    if (!checked) {
-      setLocalDailyInterestRate(0);
+    if (days > 0 && rate >= 0 && rate <= 100) {
+      setPresets([...presets, { days, rate }]);
+      setNewPresetDays('');
+      setNewPresetRate('');
+      setShowAddPresetModal(false);
     }
   };
 
-  const addPreset = () => {
-    setPresets([...presets, { days: 0, rate: 0 }]);
+  const handleAddPresetCancel = () => {
+    setNewPresetDays('');
+    setNewPresetRate('');
+    setShowAddPresetModal(false);
   };
 
   const updatePreset = (index: number, field: 'days' | 'rate', value: number) => {
@@ -99,27 +81,9 @@ export default function InterestPresetSettings({
       {/* Main Interest Preset Card */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Interest Preset</h2>
-            <p className="text-sm text-gray-600 mt-1">รูปแบบอัตราดอกเบี้ย</p>
-          </div>
-          <div className="flex flex-col items-end space-y-3">
-            <label className="flex items-center space-x-3 cursor-pointer bg-gray-50 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <input
-                type="checkbox"
-                checked={isDailyInterest}
-                onChange={(e) => handleDailyInterestToggle(e.target.checked)}
-                className="w-4 h-4 text-green-600 bg-white border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-              />
-              <span className="text-sm font-medium text-gray-700">คิดดอกเบี้ยแบบรายวัน</span>
-            </label>
-            {isDailyInterest && (
-              <div className="text-xs text-gray-500 bg-blue-50 px-2 py-1 rounded">
-                กรุณาตั้งค่าอัตราดอกเบี้ยต่อวันด้านล่าง
-              </div>
-            )}
-          </div>
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">Interest Preset</h2>
+          <p className="text-sm text-gray-600 mt-1">รูปแบบอัตราดอกเบี้ย</p>
         </div>
 
         {/* Preset Items Grid */}
@@ -185,31 +149,6 @@ export default function InterestPresetSettings({
           ))}
         </div>
 
-        {/* Daily Interest Rate Field - Show only when checkbox is checked */}
-        {isDailyInterest && (
-          <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-            <label className="block text-sm font-medium text-blue-900 mb-2">
-              Daily Interest Rate (%)
-            </label>
-            <div className="flex items-center space-x-2">
-              <input
-                type="number"
-                value={localDailyInterestRate || ''}
-                onChange={(e) => setLocalDailyInterestRate(parseFloat(e.target.value) || 0)}
-                className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                placeholder="0.025"
-                step="0.001"
-                min="0"
-                max="1"
-              />
-              <span className="text-sm text-blue-700 font-medium">% ต่อวัน</span>
-            </div>
-            <p className="text-xs text-blue-600 mt-1">
-              อัตราดอกเบี้ยที่คิดต่อวัน (เช่น 0.025 = 0.025% ต่อวัน)
-            </p>
-          </div>
-        )}
-
         {/* Add Period Button */}
         <button
           onClick={addPreset}
@@ -220,78 +159,55 @@ export default function InterestPresetSettings({
         </button>
       </div>
 
-      {/* Max Late Days Card */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              จำนวนวันล่าช้าสูงสุด
-            </label>
-            <p className="text-xs text-gray-500 mb-3">
-              สัญญาจะถูกระงับเองถ้าเลยจำนวนวันที่กำหนด
-            </p>
-            <input
-              type="number"
-              value={localMaxLateDays}
-              onChange={(e) => setLocalMaxLateDays(parseInt(e.target.value) || 0)}
-              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              min="0"
-              max="365"
-              placeholder="7"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Template Card */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 flex items-center">
-              <FileText className="w-5 h-5 mr-2 text-green-600" />
-              Template name
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">ชื่อแบบฟอร์มสัญญา</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <span className="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
-              {localTemplateName || 'สัญญารูปแบบมาตรฐาน 1'}
-            </span>
-            <button
-              onClick={() => setShowTemplateModal(true)}
-              className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Edit3 className="w-4 h-4 mr-2" />
-              Edit Template
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Template Edit Modal */}
-      {showTemplateModal && (
+      {/* Add Preset Modal */}
+      {showAddPresetModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">แก้ไขชื่อแบบฟอร์ม</h3>
-            <input
-              type="text"
-              value={localTemplateName}
-              onChange={(e) => setLocalTemplateName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent mb-4"
-              placeholder="ชื่อแบบฟอร์มสัญญา"
-            />
-            <div className="flex space-x-3">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">เพิ่มช่วงเวลาใหม่</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  จำนวนวัน
+                </label>
+                <input
+                  type="number"
+                  value={newPresetDays}
+                  onChange={(e) => setNewPresetDays(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="เช่น 45"
+                  min="1"
+                  max="365"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  อัตราดอกเบี้ย (%)
+                </label>
+                <input
+                  type="number"
+                  value={newPresetRate}
+                  onChange={(e) => setNewPresetRate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="เช่น 8.5"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                />
+              </div>
+            </div>
+            <div className="flex space-x-3 mt-6">
               <button
-                onClick={() => setShowTemplateModal(false)}
+                onClick={handleAddPresetCancel}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
               >
                 ยกเลิก
               </button>
               <button
-                onClick={() => setShowTemplateModal(false)}
+                onClick={handleAddPresetConfirm}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                disabled={!newPresetDays || !newPresetRate || parseInt(newPresetDays) <= 0 || parseFloat(newPresetRate) < 0 || parseFloat(newPresetRate) > 100}
               >
-                บันทึก
+                เพิ่ม
               </button>
             </div>
           </div>

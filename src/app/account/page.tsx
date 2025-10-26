@@ -306,26 +306,6 @@ export default function AccountPage() {
     }));
   };
 
-  const handleMaxLateDaysChange = (days: number) => {
-    setNewStoreData(prev => ({
-      ...prev,
-      delayed: {
-        ...prev.delayed,
-        maxday: days
-      }
-    }));
-  };
-
-  const handleTemplateNameChange = (name: string) => {
-    setNewStoreData(prev => ({
-      ...prev,
-      contractTemplate: {
-        ...prev.contractTemplate,
-        header: name
-      }
-    }));
-  };
-
   const TitleBadge = ({ text }: { text: string }) => (
     <div className={`bg-[#CAC8C8] text-gray-600 text-[12px] font-normal px-2 py-0.5 rounded-md ${sarabun.className}`}>
       {text}
@@ -940,13 +920,7 @@ export default function AccountPage() {
             <div className="mt-8">
               <InterestPresetSettings
                 interestPresets={newStoreData.interestPresets}
-                maxLateDays={newStoreData.delayed.maxday}
-                templateName={newStoreData.contractTemplate.header}
-                dailyInterestRate={newStoreData.interestPerday}
                 onInterestPresetsChange={handleInterestPresetsChange}
-                onMaxLateDaysChange={handleMaxLateDaysChange}
-                onTemplateNameChange={handleTemplateNameChange}
-                onDailyInterestRateChange={(rate) => handleNewStoreDataChange('interestPerday', rate)}
               />
             </div>
 

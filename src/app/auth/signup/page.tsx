@@ -97,26 +97,6 @@ export default function SignUpPage() {
     }));
   };
 
-  const handleMaxLateDaysChange = (days: number) => {
-    setFormData(prev => ({
-      ...prev,
-      delayed: {
-        ...prev.delayed,
-        maxday: days
-      }
-    }));
-  };
-
-  const handleTemplateNameChange = (name: string) => {
-    setFormData(prev => ({
-      ...prev,
-      contractTemplate: {
-        ...prev.contractTemplate,
-        header: name
-      }
-    }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -409,16 +389,7 @@ export default function SignUpPage() {
               <div className="mt-8">
                 <InterestPresetSettings
                   interestPresets={formData.interestPresets}
-                  maxLateDays={formData.delayed.maxday}
-                  templateName={formData.contractTemplate.header}
-                  dailyInterestRate={formData.interestPerday}
                   onInterestPresetsChange={handleInterestPresetsChange}
-                  onMaxLateDaysChange={handleMaxLateDaysChange}
-                  onTemplateNameChange={handleTemplateNameChange}
-                  onDailyInterestRateChange={(rate) => setFormData(prev => ({
-                    ...prev,
-                    interestPerday: rate
-                  }))}
                 />
               </div>
 
