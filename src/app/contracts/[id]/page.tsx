@@ -73,6 +73,7 @@ interface Contract {
     note?: string;
     accessories?: string;
     images: string[];
+    estimatedValue?: number;
   };
   dates: {
     startDate?: string;
@@ -92,6 +93,14 @@ interface Contract {
     beforeBalance?: number;
     afterBalance?: number;
   }>;
+  confirmationNewContract?: {
+    pawnPrice: number;
+    interestRate: number;
+    loanDays: number;
+    interest: number;
+    total: number;
+    item: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -971,10 +980,18 @@ export default function ContractDetailPage() {
               <TitleBadge text="สรุปเงินกู้" />
             </div>
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">AI Estimated Price:</span>
-                <span className="font-medium text-gray-900">{formatCurrency(contract.pawnDetails.aiEstimatedPrice)} THB</span>
-              </div>
+              {contract.status === 'active' && contract.confirmationNewContract && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Estimated Value:</span>
+                  <span className="font-medium text-gray-900">{formatCurrency(contract.item?.estimatedValue || 0)} THB</span>
+                </div>
+              )}
+              {contract.status !== 'active' && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">AI Estimated Price:</span>
+                  <span className="font-medium text-gray-900">{formatCurrency(contract.pawnDetails.aiEstimatedPrice || contract.item?.estimatedValue || 0)} THB</span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Principal Amount:</span>
                 <span className="font-semibold text-gray-900">{formatCurrency(contract.pawnDetails.pawnedPrice)} THB</span>
@@ -990,7 +1007,7 @@ export default function ContractDetailPage() {
               <div className="border-t border-gray-200 pt-4">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Interest Amount:</span>
-                <span className="font-medium text-orange-600">{formatCurrency(calculateInterest())} THB</span>
+                <span className="font-medium text-orange-600">{formatCurrency(contract.pawnDetails.totalInterest || calculateInterest())} THB</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Interest Paid:</span>
@@ -1009,7 +1026,7 @@ export default function ContractDetailPage() {
               <div className="border-t border-gray-200 pt-4">
                 <div className="flex justify-between items-center text-lg mt-2">
                   <span className="font-semibold text-gray-900">Total Repayment:</span>
-                  <span className="font-bold text-[#487C47]">{formatCurrency(calculateTotal())} THB</span>
+                  <span className="font-bold text-[#487C47]">{formatCurrency(contract.pawnDetails.remainingAmount || calculateTotal())} THB</span>
                 </div>
               </div>
             </div>

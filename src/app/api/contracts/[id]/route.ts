@@ -71,6 +71,7 @@ export async function GET(
           updatedAt: convertedItem.updatedAt
         },
         confirmationStatus: convertedItem.confirmationStatus || 'pending',
+        confirmationNewContract: convertedItem.confirmationNewContract,
         transactionHistory: []
       };
 
