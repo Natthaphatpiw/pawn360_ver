@@ -65,15 +65,25 @@ export async function POST(request: NextRequest) {
       logoUrl: null,
       stampUrl: null,
       signatureUrl: null,
-      interestRate: storeData.interestRate || [], // Array of {days: rate} objects
+      interestPresets: storeData.interestPresets || [], // Array of {days: number, rate: number} objects
       contractTemplate: {
-        header: 'สัญญาจำนำ',
-        footer: 'ขอบคุณที่ใช้บริการ',
-        terms: 'เงื่อนไขการจำนำมาตรฐาน'
+        header: storeData.contractTemplate?.header || 'สัญญาจำนำทองคำ',
+        footer: storeData.contractTemplate?.footer || 'ขอบคุณที่ใช้บริการ',
+        terms: storeData.contractTemplate?.terms || 'เงื่อนไขการจำนำมาตรฐาน'
       },
       isActive: true,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      googlemap: storeData.googlemap || '',
+      bankUrl: storeData.bankUrl || '',
+      interestPerday: storeData.interestPerday || 0.025,
+      interestSet: storeData.interestSet || {},
+      logo: null,
+      signature: null,
+      delayed: {
+        maxday: storeData.delayed?.maxday || 7,
+        feeperday: storeData.delayed?.feeperday || 100
+      }
     };
 
     const result = await db.collection('stores').insertOne(storeDoc);

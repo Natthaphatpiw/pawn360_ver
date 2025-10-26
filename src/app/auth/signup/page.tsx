@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User, Mail, Lock, Building, MapPin, Phone, CreditCard, Plus, Trash2, Percent, Calendar } from 'lucide-react';
+import InterestPresetSettings from '@/components/settings/InterestPresetSettings';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -17,15 +18,39 @@ export default function SignUpPage() {
     // Store Information
     storeName: '',
     address: {
+      houseNumber: '',
+      village: '',
       street: '',
       subDistrict: '',
       district: '',
       province: '',
+      country: 'ประเทศไทย',
       postcode: ''
     },
     phone: '',
     taxId: '',
-    interestRate: [] as Array<{days: number, rate: number}> // Array of {days: number, rate: number}
+    googlemap: '',
+    bankUrl: '',
+    interestPerday: 0.025,
+    interestSet: {
+      '7': 0.07,
+      '14': 0.08,
+      '30': 0.10
+    },
+    interestPresets: [
+      { days: 7, rate: 3 },
+      { days: 15, rate: 5 },
+      { days: 30, rate: 10 }
+    ] as Array<{days: number, rate: number}>,
+    contractTemplate: {
+      header: 'สัญญาจำนำทองคำ',
+      footer: 'ขอบคุณที่ใช้บริการ',
+      terms: 'เงื่อนไขการจำนำมาตรฐาน'
+    },
+    delayed: {
+      maxday: 7,
+      feeperday: 100
+    }
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +68,20 @@ export default function SignUpPage() {
           [addressField]: value
         }
       }));
+    } else if (name.startsWith('delayed.')) {
+      const delayedField = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        delayed: {
+          ...prev.delayed,
+          [delayedField]: name.includes('maxday') ? parseInt(value) || 0 : parseFloat(value) || 0
+        }
+      }));
+    } else if (name === 'interestPerday') {
+      setFormData(prev => ({
+        ...prev,
+        interestPerday: parseFloat(value) || 0
+      }));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -51,27 +90,30 @@ export default function SignUpPage() {
     }
   };
 
-  // Handle interest rate functions
-  const addInterestRate = () => {
+  const handleInterestPresetsChange = (presets: Array<{days: number, rate: number}>) => {
     setFormData(prev => ({
       ...prev,
-      interestRate: [...prev.interestRate, { days: 0, rate: 0 }]
+      interestPresets: presets
     }));
   };
 
-  const updateInterestRate = (index: number, field: 'days' | 'rate', value: number) => {
+  const handleMaxLateDaysChange = (days: number) => {
     setFormData(prev => ({
       ...prev,
-      interestRate: prev.interestRate.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item
-      )
+      delayed: {
+        ...prev.delayed,
+        maxday: days
+      }
     }));
   };
 
-  const removeInterestRate = (index: number) => {
+  const handleTemplateNameChange = (name: string) => {
     setFormData(prev => ({
       ...prev,
-      interestRate: prev.interestRate.filter((_, i) => i !== index)
+      contractTemplate: {
+        ...prev.contractTemplate,
+        header: name
+      }
     }));
   };
 
@@ -112,7 +154,13 @@ export default function SignUpPage() {
             address: formData.address,
             phone: formData.phone,
             tax_id: formData.taxId,
-            interestRate: formData.interestRate
+            googlemap: formData.googlemap,
+            bankUrl: formData.bankUrl,
+            interestPerday: formData.interestPerday,
+            interestSet: formData.interestSet,
+            interestPresets: formData.interestPresets,
+            contractTemplate: formData.contractTemplate,
+            delayed: formData.delayed
           }
         }),
       });
@@ -291,71 +339,82 @@ export default function SignUpPage() {
                 />
               </div>
 
-              {/* Interest Rates Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-md font-medium text-clay-grey flex items-center gap-2">
-                    <Percent size={16} className="text-leaf-green" />
-                    Interest Rates (Optional)
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={addInterestRate}
-                    className="flex items-center gap-2 px-3 py-1 bg-leaf-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-                  >
-                    <Plus size={16} />
-                    Add Rate
-                  </button>
-                </div>
+              {/* Google Maps URL */}
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-1">
+                  Google Maps URL
+                </label>
+                <input
+                  type="url"
+                  name="googlemap"
+                  value={formData.googlemap}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                  placeholder="https://maps.app.goo.gl/..."
+                />
+              </div>
 
-                {formData.interestRate.length > 0 && (
-                  <div className="space-y-3">
-                    {formData.interestRate.map((rate, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 bg-l-grey-1 rounded-lg">
-                        <div className="flex items-center gap-2 flex-1">
-                          <Calendar size={16} className="text-leaf-green" />
-                          <input
-                            type="number"
-                            placeholder="Days"
-                            value={rate.days || ''}
-                            onChange={(e) => updateInterestRate(index, 'days', parseInt(e.target.value) || 0)}
-                            className="w-20 px-3 py-2 border border-l-grey-4 rounded-lg form-input text-sm"
-                            min="1"
-                          />
-                          <span className="text-clay-grey">days</span>
-                        </div>
+              {/* Interest Per Day */}
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-1">
+                  Daily Interest Rate (%)
+                </label>
+                <input
+                  type="number"
+                  name="interestPerday"
+                  value={formData.interestPerday}
+                  onChange={handleInputChange}
+                  step="0.001"
+                  min="0"
+                  max="1"
+                  className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                  placeholder="0.025"
+                />
+              </div>
 
-                        <div className="flex items-center gap-2 flex-1">
-                          <Percent size={16} className="text-leaf-green" />
-                          <input
-                            type="number"
-                            placeholder="Rate %"
-                            value={rate.rate || ''}
-                            onChange={(e) => updateInterestRate(index, 'rate', parseFloat(e.target.value) || 0)}
-                            className="w-24 px-3 py-2 border border-l-grey-4 rounded-lg form-input text-sm"
-                            step="0.01"
-                            min="0"
-                          />
-                          <span className="text-clay-grey">%</span>
-                        </div>
+              {/* Max Late Days */}
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-1">
+                  Maximum Late Days
+                </label>
+                <input
+                  type="number"
+                  name="delayed.maxday"
+                  value={formData.delayed.maxday}
+                  onChange={handleInputChange}
+                  min="0"
+                  max="365"
+                  className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                  placeholder="7"
+                />
+              </div>
 
-                        <button
-                          type="button"
-                          onClick={() => removeInterestRate(index)}
-                          className="p-2 text-semantic-red hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {/* Late Fee Per Day */}
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-1">
+                  Late Fee Per Day (฿)
+                </label>
+                <input
+                  type="number"
+                  name="delayed.feeperday"
+                  value={formData.delayed.feeperday}
+                  onChange={handleInputChange}
+                  min="0"
+                  className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                  placeholder="100"
+                />
+              </div>
 
-                {formData.interestRate.length === 0 && (
-                  <p className="text-sm text-clay-grey italic">
-                    No interest rates added yet. Click "Add Rate" to add your first interest rate option.
-                  </p>
-                )}
+              {/* Interest Preset Settings */}
+              <div className="mt-8">
+                <InterestPresetSettings
+                  interestPresets={formData.interestPresets}
+                  maxLateDays={formData.delayed.maxday}
+                  templateName={formData.contractTemplate.header}
+                  onInterestPresetsChange={handleInterestPresetsChange}
+                  onMaxLateDaysChange={handleMaxLateDaysChange}
+                  onTemplateNameChange={handleTemplateNameChange}
+                />
               </div>
 
               {/* Address Fields */}
@@ -364,7 +423,26 @@ export default function SignUpPage() {
                   <MapPin size={16} className="text-leaf-green" />
                   Store Address
                 </h4>
-                
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    name="address.houseNumber"
+                    value={formData.address.houseNumber}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                    placeholder="House Number"
+                  />
+                  <input
+                    type="text"
+                    name="address.village"
+                    value={formData.address.village}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                    placeholder="Village"
+                  />
+                </div>
+
                 <div>
                   <input
                     type="text"
@@ -411,6 +489,18 @@ export default function SignUpPage() {
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
                     placeholder="Postcode"
+                  />
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    name="address.country"
+                    value={formData.address.country}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input bg-gray-50"
+                    placeholder="Country"
+                    readOnly
                   />
                 </div>
               </div>

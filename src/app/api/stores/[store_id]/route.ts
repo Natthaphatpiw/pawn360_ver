@@ -76,7 +76,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       phone: storeData.phone,
       taxId: storeData.tax_id,
       address: storeData.address,
-      interestRate: storeData.interestRate || [], // Update interest rates if provided
+      interestPresets: storeData.interestPresets || [], // Update interest presets if provided
+      contractTemplate: storeData.contractTemplate,
+      googlemap: storeData.googlemap,
+      bankUrl: storeData.bankUrl,
+      interestPerday: storeData.interestPerday,
+      interestSet: storeData.interestSet,
+      logo: storeData.logo,
+      signature: storeData.signature,
+      delayed: storeData.delayed,
       updatedAt: new Date()
     };
 
