@@ -243,11 +243,19 @@ export default function SignUpPage() {
       <div className="max-w-2xl w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <Link href="/" className="text-3xl font-bold text-leaf-green mb-4 inline-block">
+          <a href="/" className="text-3xl font-bold text-leaf-green mb-4 inline-block cursor-pointer">
             Pawn360
-          </Link>
+          </a>
           <h2 className="text-3xl font-bold text-d-grey-5">Create Your Account</h2>
           <p className="mt-2 text-clay-grey">Join Pawn360 and start managing your pawn shop digitally</p>
+          <div className="mt-4 flex justify-center space-x-4">
+            <a href="/" className="text-leaf-green hover:text-green-600 text-sm font-medium">
+              ← กลับไปหน้าแรก
+            </a>
+            <a href="/auth/login" className="text-leaf-green hover:text-green-600 text-sm font-medium">
+              เข้าสู่ระบบ
+            </a>
+          </div>
         </div>
 
         {/* Form */}

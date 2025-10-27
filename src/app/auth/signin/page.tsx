@@ -27,11 +27,8 @@ export default function SignInPage() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    console.log('Starting login process...');
 
     try {
-      console.log('Calling /api/auth/signin with:', { email: formData.email, hasPassword: !!formData.password });
-
       // Call Next.js API routes
       const response = await fetch('/api/auth/signin', {
         method: 'POST',
@@ -41,18 +38,12 @@ export default function SignInPage() {
         body: JSON.stringify(formData),
       });
 
-      console.log('API response status:', response.status);
-
       const data = await response.json();
-      console.log('API response data:', data);
 
       if (response.ok) {
-        console.log('Login successful, storing data...');
-
         // Store token and user data
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('token', data.access_token);
-        localStorage.setItem('access_token', data.access_token); // Also store as access_token
         localStorage.setItem('user', JSON.stringify(data.user));
         if (data.store) {
           localStorage.setItem('store', JSON.stringify(data.store));
@@ -61,20 +52,14 @@ export default function SignInPage() {
           localStorage.setItem('stores', JSON.stringify(data.stores));
         }
 
-        console.log('Data stored, redirecting to dashboard...');
-
-        // Small delay to ensure localStorage is written
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 100);
-
+        // Redirect to dashboard
+        router.push('/dashboard');
       } else {
-        console.log('Login failed:', data.error);
         setError(data.error || 'Sign in failed');
       }
     } catch (err) {
-      console.error('Login error:', err);
       setError('Network error. Please try again.');
+      console.error('Login error:', err);
     }
 
     setIsLoading(false);
