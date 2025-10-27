@@ -89,14 +89,20 @@ export default function FixedLayout({ children }: FixedLayoutProps) {
   };
 
   useEffect(() => {
+    console.log('FixedLayout: Checking authentication...');
     const token = localStorage.getItem('access_token');
     const user = localStorage.getItem('user');
 
+    console.log('FixedLayout: token exists:', !!token);
+    console.log('FixedLayout: user exists:', !!user);
+
     if (!token || !user) {
+      console.log('FixedLayout: No token or user, redirecting to signin');
       router.push('/auth/signin');
       return;
     }
 
+    console.log('FixedLayout: Authentication valid, setting state');
     setIsAuthenticated(true);
     setIsLoading(false);
 
