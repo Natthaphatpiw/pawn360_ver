@@ -3,14 +3,14 @@ import { getDatabase } from '@/lib/mongodb';
 import { getUserIdFromToken } from '@/lib/auth';
 import { ObjectId } from 'mongodb';
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = getUserIdFromToken(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { action, responseMessage } = body; // action: 'confirm' | 'reject'
 
