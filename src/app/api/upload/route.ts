@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         key = `shop_signature/${storeId}.png`;
         break;
       case 'bank':
-        key = `bank/QRCode.png`; // Fixed filename for bank QR
+        key = `bank/${storeId}.png`; // Store-specific QR code
         break;
       default:
         return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });

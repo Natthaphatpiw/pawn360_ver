@@ -71,6 +71,8 @@ export default function AccountPage() {
   const [user, setUser] = useState<any>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [qrCodeUploading, setQrCodeUploading] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
 
   const [newStoreData, setNewStoreData] = useState<StoreData>({
     storeName: '',
@@ -304,6 +306,61 @@ export default function AccountPage() {
       ...prev,
       interestPresets: presets
     }));
+  };
+
+  // Handle QR Code upload
+  const handleQrCodeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 5MB)');
+      return;
+    }
+
+    setQrCodeUploading(true);
+
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      formDataUpload.append('type', 'bank');
+      formDataUpload.append('storeId', 'temp'); // Temporary store ID, will be updated after store creation
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+        body: formDataUpload,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      setQrCodeUrl(data.url);
+      setNewStoreData(prev => ({
+        ...prev,
+        bankUrl: data.url
+      }));
+
+    } catch (error) {
+      console.error('QR Code upload error:', error);
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setQrCodeUploading(false);
+      // Reset input
+      event.target.value = '';
+    }
   };
 
   const TitleBadge = ({ text }: { text: string }) => (
@@ -913,6 +970,54 @@ export default function AccountPage() {
                     placeholder="รหัสไปรษณีย์"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* QR Code Upload */}
+            <div>
+              <label className="text-sm font-medium text-gray-900 block mb-2">Bank QR Code (Optional)</label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-4">
+                  <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                    {qrCodeUploading ? (
+                      <div className="flex flex-col items-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                        <span className="text-xs text-gray-500 mt-1">Uploading...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span className="text-xs text-gray-500 mt-1">QR Code</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleQrCodeUpload}
+                      disabled={qrCodeUploading}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {qrCodeUrl && (
+                    <div className="flex flex-col items-center">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-300">
+                        <img
+                          src={qrCodeUrl}
+                          alt="Bank QR Code"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span className="text-xs text-green-600 mt-1">Uploaded</span>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  อัพโหลด QR Code สำหรับการชำระเงินผ่านธนาคาร (PNG, JPG, GIF สูงสุด 5MB)
+                </p>
               </div>
             </div>
 

@@ -55,6 +55,8 @@ export default function SignUpPage() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [qrCodeUploading, setQrCodeUploading] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -95,6 +97,61 @@ export default function SignUpPage() {
       ...prev,
       interestPresets: presets
     }));
+  };
+
+  // Handle QR Code upload
+  const handleQrCodeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 5MB)');
+      return;
+    }
+
+    setQrCodeUploading(true);
+
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      formDataUpload.append('type', 'bank');
+      formDataUpload.append('storeId', 'temp'); // Temporary store ID, will be updated after store creation
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+        body: formDataUpload,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      setQrCodeUrl(data.url);
+      setFormData(prev => ({
+        ...prev,
+        bankUrl: data.url
+      }));
+
+    } catch (error) {
+      console.error('QR Code upload error:', error);
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setQrCodeUploading(false);
+      // Reset input
+      event.target.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,18 +207,26 @@ export default function SignUpPage() {
       if (response.ok) {
         // Store token if provided
         if (data.access_token) {
+          localStorage.setItem('isAuthenticated', 'true');
           localStorage.setItem('token', data.access_token);
+          localStorage.setItem('access_token', data.access_token); // Also store as access_token for consistency
           localStorage.setItem('user', JSON.stringify(data.user));
           if (data.store) {
             localStorage.setItem('store', JSON.stringify(data.store));
+          }
+          if (data.stores) {
+            localStorage.setItem('stores', JSON.stringify(data.stores));
           }
         }
 
         // Show success message and redirect to dashboard
         alert('Account created successfully! Redirecting to dashboard...');
 
-        // Redirect to dashboard
-        router.push('/dashboard');
+        // Small delay to ensure localStorage is fully written
+        setTimeout(() => {
+          // Redirect to dashboard
+          router.push('/dashboard');
+        }, 100);
       } else {
         setError(data.error || data.message || 'Signup failed');
       }
@@ -383,6 +448,56 @@ export default function SignUpPage() {
                   className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
                   placeholder="100"
                 />
+              </div>
+
+              {/* QR Code Upload */}
+              <div>
+                <label className="block text-sm font-medium text-clay-grey mb-1">
+                  Bank QR Code (Optional)
+                </label>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-4">
+                    <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                      {qrCodeUploading ? (
+                        <div className="flex flex-col items-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                          <span className="text-xs text-gray-500 mt-1">Uploading...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          <span className="text-xs text-gray-500 mt-1">QR Code</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleQrCodeUpload}
+                        disabled={qrCodeUploading}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {qrCodeUrl && (
+                      <div className="flex flex-col items-center">
+                        <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-300">
+                          <img
+                            src={qrCodeUrl}
+                            alt="Bank QR Code"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <span className="text-xs text-green-600 mt-1">Uploaded</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-gray-500">
+                    อัพโหลด QR Code สำหรับการชำระเงินผ่านธนาคาร (PNG, JPG, GIF สูงสุด 5MB)
+                  </p>
+                </div>
               </div>
 
               {/* Interest Preset Settings */}

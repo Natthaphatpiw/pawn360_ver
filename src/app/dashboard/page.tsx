@@ -95,7 +95,7 @@ export default function DashboardPage() {
         const token = localStorage.getItem('access_token');
 
         if (!userStr || !token) {
-          router.push('/auth/login');
+          router.push('/auth/signin');
           return;
         }
 
