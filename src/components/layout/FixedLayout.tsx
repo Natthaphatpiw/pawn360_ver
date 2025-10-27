@@ -30,6 +30,12 @@ const menuItems = [
     description: 'Overview and analytics'
   },
   {
+    name: 'Monitoring',
+    icon: Bell,
+    href: '/monitoring',
+    description: 'LINE notifications'
+  },
+  {
     name: 'Pawn Entry',
     icon: PiPackageFill,
     href: '/pawn-entry',
