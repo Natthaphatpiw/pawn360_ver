@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
+import { Bell } from 'lucide-react';
 import { IoHome } from "react-icons/io5"
 import { PiPackageFill } from "react-icons/pi";
 import { AiFillFileText } from "react-icons/ai";
@@ -20,6 +21,10 @@ const inter = Poppins({
   weight: '400',
   subsets: ['latin'],
 })
+
+interface SidebarProps {
+  notificationCount?: number;
+}
 
 const menuItems = [
   {
@@ -41,6 +46,12 @@ const menuItems = [
     description: 'Manage all contracts'
   },
   {
+    name: 'Monitor',
+    icon: Bell,
+    href: '/monitor',
+    description: 'Customer notifications'
+  },
+  {
     name: 'Account',
     icon: ImProfile,
     href: '/account',
@@ -48,7 +59,7 @@ const menuItems = [
   }
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ notificationCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -99,12 +110,21 @@ export default function Sidebar() {
                 </div>
                 
                 {/* Text Container */}
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex items-center justify-between">
                   <h6 className={`text-[0.785rem] font-[500] whitespace-nowrap overflow-hidden text-ellipsis ${inter.className} ${
                     isActive ? 'text-[#0E5D1E] hover:text-[#0A4215]' : 'text-[#9A9694] hover:text-[#5E9268]'
                   }`}>
                     {item.name}
                   </h6>
+
+                  {/* Notification Badge for Monitor */}
+                  {item.name === 'Monitor' && notificationCount > 0 && (
+                    <div className="flex-shrink-0 ml-2">
+                      <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
+                        {notificationCount > 99 ? '99+' : notificationCount}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </Link>
             );

@@ -30,12 +30,6 @@ const menuItems = [
     description: 'Overview and analytics'
   },
   {
-    name: 'Monitoring',
-    icon: Bell,
-    href: '/monitoring',
-    description: 'LINE notifications'
-  },
-  {
     name: 'Pawn Entry',
     icon: PiPackageFill,
     href: '/pawn-entry',
@@ -46,6 +40,12 @@ const menuItems = [
     icon: AiFillFileText,
     href: '/contracts',
     description: 'Manage all contracts'
+  },
+  {
+    name: 'Monitor',
+    icon: Bell,
+    href: '/monitor',
+    description: 'Customer notifications'
   },
   {
     name: 'Account',
@@ -61,6 +61,32 @@ export default function FixedLayout({ children }: FixedLayoutProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  // Fetch notification count
+  const fetchNotificationCount = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      const response = await fetch('/api/notifications', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const notifications = await response.json();
+        const pendingCount = notifications.filter((n: any) =>
+          n.status === 'pending' || n.status === 'payment_pending'
+        ).length;
+        setNotificationCount(pendingCount);
+      }
+    } catch (error) {
+      console.error('Failed to fetch notification count:', error);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -73,6 +99,14 @@ export default function FixedLayout({ children }: FixedLayoutProps) {
 
     setIsAuthenticated(true);
     setIsLoading(false);
+
+    // Fetch notification count
+    fetchNotificationCount();
+
+    // Poll for notification updates every 30 seconds
+    const interval = setInterval(fetchNotificationCount, 30000);
+
+    return () => clearInterval(interval);
   }, [router]);
 
   const handleLogout = () => {
@@ -174,7 +208,7 @@ export default function FixedLayout({ children }: FixedLayoutProps) {
             fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:transform-none py-[0.4rem]
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}>
-            <Sidebar />
+            <Sidebar notificationCount={notificationCount} />
           </div>
         </aside>
 
