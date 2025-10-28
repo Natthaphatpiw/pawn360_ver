@@ -1,0 +1,199 @@
+### 📋 **API Endpoints สำหรับระบบ LINE Integration:**
+
+## 1. **POST /api/notifications/redemption**
+### **รับคำขอไถ่ถอนจากลูกค้า**
+
+**Request:**
+```bash
+POST https://pawn360-ver.vercel.app/api/notifications/redemption
+Content-Type: application/json
+
+{
+  "storeId": "651234567890abcdef12345",
+  "customerId": "651234567890abcdef12346", 
+  "contractId": "651234567890abcdef12347",
+  "customerName": "สมชาย ใจดี",
+  "phone": "0812345678",
+  "message": "ต้องการไถ่ถอนทองคำที่จำนำไว้"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "notificationId": "651234567890abcdef12348",
+  "message": "Redemption notification created successfully"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Missing required fields: storeId, customerId, contractId"
+}
+```
+
+---
+
+## 2. **POST /api/notifications/extension**
+### **รับคำขอต่อดอกเบี้ยจากลูกค้า**
+
+**Request:**
+```bash
+POST https://pawn360-ver.vercel.app/api/notifications/extension
+Content-Type: application/json
+
+{
+  "storeId": "651234567890abcdef12345",
+  "customerId": "651234567890abcdef12346",
+  "contractId": "651234567890abcdef12347", 
+  "customerName": "สมชาย ใจดี",
+  "phone": "0812345678",
+  "message": "ต้องการต่อดอกเบี้ยเพิ่มอีก 7 วัน"
+}
+```
+
+**Response:** เหมือนกับ redemption
+
+---
+
+## 3. **POST /api/notifications/payment-proof**
+### **รับหลักฐานการโอนเงิน (อัพโหลดรูปสลิป)**
+
+**Request:**
+```bash
+POST https://pawn360-ver.vercel.app/api/notifications/payment-proof
+Content-Type: multipart/form-data
+
+# Form Data:
+notificationId: "651234567890abcdef12348"
+file: [สลิปโอนเงิน.png] (ไฟล์รูปภาพ)
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "paymentProofUrl": "https://pawn360-ver.vercel.app/api/files/presigned?key=payment_proofs/651234567890abcdef12348_1730123456789.jpg",
+  "message": "Payment proof uploaded successfully"
+}
+```
+
+---
+
+## 4. **GET /api/notifications**
+### **ดึงรายการแจ้งเตือนทั้งหมดของร้านค้า**
+
+**Request:**
+```bash
+GET https://pawn360-ver.vercel.app/api/notifications
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+**Response:**
+```json
+[
+  {
+    "_id": "651234567890abcdef12348",
+    "storeId": "651234567890abcdef12345",
+    "customerId": "651234567890abcdef12346",
+    "contractId": "651234567890abcdef12347",
+    "type": "redemption",
+    "status": "pending",
+    "message": "ต้องการไถ่ถอนทองคำที่จำนำไว้",
+    "customerName": "สมชาย ใจดี",
+    "phone": "0812345678",
+    "responseMessage": "",
+    "qrCodeUrl": "",
+    "paymentProofUrl": "",
+    "createdAt": "2025-10-28T06:00:00.000Z",
+    "updatedAt": "2025-10-28T06:00:00.000Z"
+  }
+]
+```
+
+---
+
+## 5. **PUT /api/notifications/{id}/actions**
+### **ยืนยัน/ปฏิเสธคำขอ พร้อมส่ง QR code กลับ**
+
+**Request (Confirm):**
+```bash
+PUT https://pawn360-ver.vercel.app/api/notifications/651234567890abcdef12348/actions
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "confirm",
+  "responseMessage": "ยอมรับคำขอไถ่ถอนแล้ว กรุณาชำระเงินตาม QR Code ที่แนบมา"
+}
+```
+
+**Request (Reject):**
+```bash
+PUT https://pawn360-ver.vercel.app/api/notifications/651234567890abcdef12348/actions
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "reject", 
+  "responseMessage": "ขออภัย ไม่สามารถไถ่ถอนได้ในขณะนี้"
+}
+```
+
+**Response (Confirm Success):**
+```json
+{
+  "success": true,
+  "notification": {
+    "_id": "651234567890abcdef12348",
+    "status": "confirmed",
+    "qrCodeUrl": "https://pawn360.s3.ap-southeast-2.amazonaws.com/...presigned-url...",
+    "responseMessage": "ยอมรับคำขอไถ่ถอนแล้ว กรุณาชำระเงินตาม QR Code ที่แนบมา"
+  },
+  "responseData": {
+    "notificationId": "651234567890abcdef12348",
+    "action": "confirm",
+    "confirmed": true,
+    "message": "ยอมรับคำขอไถ่ถอนแล้ว กรุณาชำระเงินตาม QR Code ที่แนบมา",
+    "qrCodeUrl": "https://pawn360.s3.ap-southeast-2.amazonaws.com/...presigned-url...",
+    "storeId": "651234567890abcdef12345",
+    "timestamp": "2025-10-28T06:18:47.942Z"
+  }
+}
+```
+
+---
+
+## 6. **GET /api/files/presigned**
+### **Generate Presigned URL สำหรับเข้าถึงไฟล์**
+
+**Request:**
+```bash
+GET https://pawn360-ver.vercel.app/api/files/presigned?key=payment_proofs/651234567890abcdef12348_1730123456789.jpg
+```
+
+**Response:**
+```json
+{
+  "presignedUrl": "https://pawn360.s3.ap-southeast-2.amazonaws.com/payment_proofs/651234567890abcdef12348_1730123456789.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=...&X-Amz-Date=...&X-Amz-Expires=3600&X-Amz-Signature=...&X-Amz-SignedHeaders=host"
+}
+```
+
+---
+
+### 🔐 **Authentication:**
+- API ที่ต้อง authentication ใช้ JWT token ใน `Authorization: Bearer <token>` header
+- Token ได้มาจากการ login ผ่าน `/auth/login`
+
+### 📝 **Workflow สำหรับระบบ LINE:**
+
+1. **ลูกค้าส่งคำขอ** → LINE POST ไปยัง redemption/extension API
+2. **พนักงานเห็นแจ้งเตือน** → เข้าดูในหน้า `/monitor` 
+3. **พนักงานยืนยัน** → PUT ไปยัง actions API → ได้ QR code presigned URL
+4. **LINE ส่ง QR code** → ให้ลูกค้าชำระเงิน
+5. **ลูกค้าอัพโหลดสลิป** → LINE POST ไปยัง payment-proof API
+6. **พนักงานตรวจสอบ** → ยืนยันการชำระเงินใน `/monitor`
+
+ตอนนี้ระบบพร้อมใช้งานแล้ว! 🎉

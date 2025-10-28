@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import FixedLayout from '@/components/layout/FixedLayout';
 import { useRouter } from 'next/navigation';
 import {
@@ -74,7 +74,6 @@ export default function AccountPage() {
   const [qrCodeUploading, setQrCodeUploading] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [editingStoreData, setEditingStoreData] = useState<any>(null);
-  const [currentStore, setCurrentStore] = useState<any>(null);
 
   const [newStoreData, setNewStoreData] = useState<StoreData>({
     storeName: '',
@@ -453,16 +452,11 @@ export default function AccountPage() {
     );
   }
 
-  // Update currentStore when userStores or selectedStoreIndex changes
-  useEffect(() => {
-    if (userStores.length === 0) {
-      setCurrentStore(null);
-      return;
-    }
+  // Calculate current store synchronously (safer than useEffect)
+  const currentStore = useMemo(() => {
+    if (!userStores || userStores.length === 0) return null;
     const validIndex = Math.min(selectedStoreIndex, userStores.length - 1);
-    const store = userStores[validIndex] || userStores[0] || null;
-    setCurrentStore(store);
-    console.log('Current store updated:', validIndex, store?.storeName, userStores.length, 'selectedIndex:', selectedStoreIndex);
+    return userStores[validIndex] || userStores[0] || null;
   }, [userStores, selectedStoreIndex]);
 
   return (
