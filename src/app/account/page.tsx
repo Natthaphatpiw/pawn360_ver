@@ -73,6 +73,7 @@ export default function AccountPage() {
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [qrCodeUploading, setQrCodeUploading] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [qrCodeFile, setQrCodeFile] = useState<File | null>(null); // Store the actual file
   const [editingStoreData, setEditingStoreData] = useState<any>(null);
 
   const [newStoreData, setNewStoreData] = useState<StoreData>({
@@ -209,14 +210,14 @@ export default function AccountPage() {
       const token = localStorage.getItem('access_token');
       if (!token) return;
 
-      // Map frontend field names to backend expected field names
+      // Step 1: Create store first (without bankUrl)
       const backendData = {
         store_name: newStoreData.storeName,
         address: newStoreData.address,
         phone: newStoreData.phone,
         tax_id: newStoreData.taxId,
         googlemap: newStoreData.googlemap,
-        bankUrl: newStoreData.bankUrl,
+        bankUrl: '', // Will be updated after QR upload if file exists
         interestPerday: newStoreData.interestPerday,
         interestSet: newStoreData.interestSet,
         interestPresets: newStoreData.interestPresets,
@@ -224,7 +225,7 @@ export default function AccountPage() {
         delayed: newStoreData.delayed
       };
 
-        const response = await fetch('/api/stores', {
+      const response = await fetch('/api/stores', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -235,8 +236,44 @@ export default function AccountPage() {
 
       if (response.ok) {
         const newStore = await response.json();
+        
+        // Step 2: If QR code file exists, upload it with the actual store ID
+        if (qrCodeFile) {
+          try {
+            const formDataUpload = new FormData();
+            formDataUpload.append('file', qrCodeFile);
+            formDataUpload.append('type', 'bank');
+            formDataUpload.append('storeId', newStore._id); // Use actual store ID
+
+            const uploadResponse = await fetch('/api/upload', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+              body: formDataUpload,
+            });
+
+            if (uploadResponse.ok) {
+              const uploadData = await uploadResponse.json();
+              newStore.bankUrl = uploadData.url; // Update with actual S3 URL
+            } else {
+              console.error('QR upload failed');
+            }
+          } catch (uploadErr) {
+            console.error('QR upload error:', uploadErr);
+            // Continue even if QR upload fails
+          }
+        }
+        
+        // Step 3: Update UI
         setUserStores(prev => [...prev, newStore]);
         setShowCreateStoreModal(false);
+        
+        // Clear QR code state
+        setQrCodeFile(null);
+        setQrCodeUrl('');
+        
+        // Reset form data
         setNewStoreData({
           storeName: '',
           address: {
@@ -274,6 +311,7 @@ export default function AccountPage() {
             feeperday: 100
           }
         });
+        
         alert('Store created successfully!');
       } else {
         alert('Failed to create store');
@@ -309,7 +347,7 @@ export default function AccountPage() {
     }));
   };
 
-  // Handle QR Code upload
+  // Handle QR Code upload - Just preview, actual upload happens after store creation
   const handleQrCodeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -326,49 +364,15 @@ export default function AccountPage() {
       return;
     }
 
-    setQrCodeUploading(true);
-
-    try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
-      formDataUpload.append('type', 'bank');
-      formDataUpload.append('storeId', 'temp'); // Temporary store ID, will be updated after store creation
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-        body: formDataUpload,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const data = await response.json();
-
-      // Get presigned URL for preview
-      const urlParts = data.url.split('/');
-      const key = urlParts.slice(-2).join('/'); // Get the last two parts (e.g., temp/bank/userId_timestamp.png)
-      const presignedResponse = await fetch(`/api/files/presigned?key=${key}`);
-      const presignedData = await presignedResponse.json();
-
-      setQrCodeUrl(presignedData.presignedUrl || data.url);
-      setNewStoreData(prev => ({
-        ...prev,
-        bankUrl: data.url // Keep the S3 URL for storage, use presigned for display
-      }));
-
-    } catch (error) {
-      console.error('QR Code upload error:', error);
-      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setQrCodeUploading(false);
-      // Reset input
-      event.target.value = '';
-    }
+    // Store the file for later upload after store creation
+    setQrCodeFile(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setQrCodeUrl(previewUrl);
+    
+    // Reset input
+    event.target.value = '';
   };
 
   // Start editing store
