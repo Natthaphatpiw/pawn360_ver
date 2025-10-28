@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import FixedLayout from '@/components/layout/FixedLayout';
 import { useRouter } from 'next/navigation';
 import {
@@ -459,6 +459,8 @@ export default function AccountPage() {
     return userStores[validIndex] || userStores[0] || null;
   };
 
+  const currentStore = getCurrentStore();
+
   return (
     <FixedLayout>
       <div className={`flex flex-col lg:flex-row h-full gap-1 ${sarabun.className}`}>
@@ -820,7 +822,7 @@ export default function AccountPage() {
                       </div>
                     </div>
                     </div>
-                  ) : null;
+                  );
                 })()}
                 ) : (
                   <div className="bg-white rounded-lg p-8 border border-gray-200 text-center">
