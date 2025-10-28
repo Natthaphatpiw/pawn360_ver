@@ -159,12 +159,12 @@ export default function FixedLayout({ children }: FixedLayoutProps) {
             <div className="flex items-center gap-2 px-0">
             <div className="pr-[1.8rem] pl-[2.2rem]">
             <Link href="/dashboard" className="block">
-              <Image 
-                src="/images/Logo.avif" 
-                alt="Pawn360 Logo" 
-                width={130} 
-                height={45} 
-                className="mx-auto" 
+              <Image
+                src="/images/Logo.png"
+                alt="Pawn360 Logo"
+                width={130}
+                height={45}
+                className="mx-auto"
               />
             </Link>
             </div>

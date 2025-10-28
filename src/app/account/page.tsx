@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import FixedLayout from '@/components/layout/FixedLayout';
 import { useRouter } from 'next/navigation';
 import {
@@ -452,13 +452,14 @@ export default function AccountPage() {
     );
   }
 
-  // Ensure selectedStoreIndex is valid and memoize currentStore
-  const currentStore = useMemo(() => {
+  // Get current store safely
+  const getCurrentStore = () => {
     if (userStores.length === 0) return null;
     const validIndex = Math.min(selectedStoreIndex, userStores.length - 1);
-    const store = userStores[validIndex] || userStores[0];
-    return store;
-  }, [userStores, selectedStoreIndex]);
+    return userStores[validIndex] || userStores[0] || null;
+  };
+
+  const currentStore = getCurrentStore();
 
   return (
     <FixedLayout>
@@ -607,7 +608,7 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                {currentStore ? (
+                {currentStore && currentStore._id ? (
                   <div key={currentStore._id}>
                     {/* General Section */}
                     <div className="bg-[#ffffff] rounded-lg p-6 border border-gray-200">
