@@ -379,11 +379,12 @@ export default function AccountPage() {
 
   // Save store changes
   const saveStoreChanges = async () => {
-    if (!editingStoreData || !currentStore) return;
+    const storeToEdit = userStores[selectedStoreIndex];
+    if (!editingStoreData || !storeToEdit) return;
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/stores/${currentStore._id}`, {
+      const response = await fetch(`/api/stores/${storeToEdit._id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -452,14 +453,6 @@ export default function AccountPage() {
     );
   }
 
-  // Get current store safely (computed synchronously)
-  const getCurrentStore = () => {
-    if (!userStores || userStores.length === 0) return null;
-    const validIndex = Math.min(selectedStoreIndex, userStores.length - 1);
-    return userStores[validIndex] || userStores[0] || null;
-  };
-
-  const currentStore = getCurrentStore();
 
   return (
     <FixedLayout>
@@ -609,10 +602,8 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                {(() => {
-                  const currentStore = getCurrentStore();
-                  return currentStore && currentStore._id ? (
-                    <div key={`store-${currentStore._id}`}>
+                {userStores.length > 0 && userStores[selectedStoreIndex] ? (
+                    <div key={`store-${userStores[selectedStoreIndex]._id}-${selectedStoreIndex}`}>
                     {/* General Section */}
                     <div className="bg-[#ffffff] rounded-lg p-6 border border-gray-200">
                       <div className="flex items-center gap-1 mb-4">
@@ -624,19 +615,19 @@ export default function AccountPage() {
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Store name</label>
                           <div className="text-xs text-gray-500 mb-2">ชื่อร้าน</div>
-                          <div className="text-gray-900 font-medium">{currentStore.storeName}</div>
+                          <div className="text-gray-900 font-medium">{userStores[selectedStoreIndex].storeName}</div>
                         </div>
 
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Phone</label>
                           <div className="text-xs text-gray-500 mb-2">เบอร์โทรศัพท์</div>
-                          <div className="text-gray-900 font-medium">{currentStore.phone}</div>
+                          <div className="text-gray-900 font-medium">{userStores[selectedStoreIndex].phone}</div>
                         </div>
 
                         <div className="col-span-2">
                           <label className="text-sm font-medium text-gray-900 block">Tax ID</label>
                           <div className="text-xs text-gray-500 mb-2">เลขผู้เสียภาษี</div>
-                          <div className="text-gray-900 font-medium">{currentStore.taxId}</div>
+                          <div className="text-gray-900 font-medium">{userStores[selectedStoreIndex].taxId}</div>
                         </div>
                       </div>
                     </div>
@@ -651,41 +642,41 @@ export default function AccountPage() {
                       <div className="grid grid-cols-3 gap-4">
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Address (เลขที่)</label>
-                          <div className="text-gray-900 font-medium mt-2">{currentStore.address?.houseNumber || '-'}</div>
+                          <div className="text-gray-900 font-medium mt-2">{userStores[selectedStoreIndex].address?.houseNumber || '-'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Village/Building (หมู่บ้าน/อาคาร)</label>
-                          <div className="text-gray-900 font-medium mt-2">{currentStore.address?.village || '-'}</div>
+                          <div className="text-gray-900 font-medium mt-2">{userStores[selectedStoreIndex].address?.village || '-'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Street (ตรอก/ซอย/ถนน)</label>
-                          <div className="text-gray-900 font-medium mt-2">{currentStore.address?.street || '-'}</div>
+                          <div className="text-gray-900 font-medium mt-2">{userStores[selectedStoreIndex].address?.street || '-'}</div>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-4 mt-4">
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Sub-district (แขวง/ตำบล)</label>
-                          <div className="text-gray-900 font-medium mt-2">{currentStore.address?.subDistrict || '-'}</div>
+                          <div className="text-gray-900 font-medium mt-2">{userStores[selectedStoreIndex].address?.subDistrict || '-'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">District (เขต/อำเภอ)</label>
-                          <div className="text-gray-900 font-medium mt-2">{currentStore.address?.district || '-'}</div>
+                          <div className="text-gray-900 font-medium mt-2">{userStores[selectedStoreIndex].address?.district || '-'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Province (จังหวัด)</label>
-                          <div className="text-gray-900 font-medium mt-2">{currentStore.address?.province || '-'}</div>
+                          <div className="text-gray-900 font-medium mt-2">{userStores[selectedStoreIndex].address?.province || '-'}</div>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Country (ประเทศ)</label>
-                          <div className="text-gray-900 font-medium mt-2">{currentStore.address?.country || 'ประเทศไทย'}</div>
+                          <div className="text-gray-900 font-medium mt-2">{userStores[selectedStoreIndex].address?.country || 'ประเทศไทย'}</div>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Postcode (รหัสไปรษณีย์)</label>
-                          <div className="text-gray-900 font-medium mt-2">{currentStore.address?.postcode || '-'}</div>
+                          <div className="text-gray-900 font-medium mt-2">{userStores[selectedStoreIndex].address?.postcode || '-'}</div>
                         </div>
                       </div>
                     </div>
@@ -703,27 +694,27 @@ export default function AccountPage() {
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Daily Interest Rate (%)</label>
                           <div className="text-xs text-gray-500 mb-2">อัตราดอกเบี้ยรายวัน</div>
-                          <div className="text-gray-900 font-medium">{currentStore.interestPerday ? `${currentStore.interestPerday}%` : '-'}</div>
+                          <div className="text-gray-900 font-medium">{userStores[selectedStoreIndex].interestPerday ? `${userStores[selectedStoreIndex].interestPerday}%` : '-'}</div>
                         </div>
 
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Late Fee Per Day (฿)</label>
                           <div className="text-xs text-gray-500 mb-2">ค่าปรับล่าช้าต่อวัน</div>
-                          <div className="text-gray-900 font-medium">{currentStore.delayed?.feeperday ? `${currentStore.delayed.feeperday} บาท` : '-'}</div>
+                          <div className="text-gray-900 font-medium">{userStores[selectedStoreIndex].delayed?.feeperday ? `${userStores[selectedStoreIndex].delayed.feeperday} บาท` : '-'}</div>
                         </div>
 
                         <div>
                           <label className="text-sm font-medium text-gray-900 block">Max Late Days</label>
                           <div className="text-xs text-gray-500 mb-2">จำนวนวันที่อนุญาตให้ล่าช้า</div>
-                          <div className="text-gray-900 font-medium">{currentStore.delayed?.maxday ? `${currentStore.delayed.maxday} วัน` : '-'}</div>
+                          <div className="text-gray-900 font-medium">{userStores[selectedStoreIndex].delayed?.maxday ? `${userStores[selectedStoreIndex].delayed.maxday} วัน` : '-'}</div>
                         </div>
 
                         <div className="md:col-span-2">
                           <label className="text-sm font-medium text-gray-900 block">Interest Presets</label>
                           <div className="text-xs text-gray-500 mb-2">อัตราดอกเบี้ยตามจำนวนวัน</div>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                            {currentStore.interestPresets && currentStore.interestPresets.length > 0 ? (
-                              currentStore.interestPresets.map((preset: any, index: number) => (
+                            {userStores[selectedStoreIndex].interestPresets && userStores[selectedStoreIndex].interestPresets.length > 0 ? (
+                              userStores[selectedStoreIndex].interestPresets.map((preset: any, index: number) => (
                                 <div key={index} className="bg-gray-50 p-3 rounded-lg">
                                   <div className="text-sm font-medium text-gray-900">{preset.days} วัน</div>
                                   <div className="text-xs text-gray-600">{preset.rate}% ต่อเดือน</div>
@@ -747,7 +738,7 @@ export default function AccountPage() {
                       </div>
 
                       <div className="space-y-4">
-                        {currentStore.bankUrl ? (
+                        {userStores[selectedStoreIndex].bankUrl ? (
                           <div className="flex items-center gap-4">
                             <div>
                               <label className="text-sm font-medium text-gray-900 block">Bank QR Code</label>
@@ -756,7 +747,7 @@ export default function AccountPage() {
                             <button
                               onClick={async () => {
                                 try {
-                                  const urlParts = currentStore.bankUrl.split('/');
+                                  const urlParts = userStores[selectedStoreIndex].bankUrl.split('/');
                                   const key = urlParts.slice(-2).join('/');
                                   const response = await fetch(`/api/files/presigned?key=${key}`);
                                   const data = await response.json();
@@ -812,7 +803,7 @@ export default function AccountPage() {
                           </>
                         ) : (
                           <button
-                            onClick={() => startEditingStore(currentStore)}
+                            onClick={() => startEditingStore(userStores[selectedStoreIndex])}
                             className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
                           >
                             <Edit size={16} />
@@ -822,9 +813,7 @@ export default function AccountPage() {
                       </div>
                     </div>
                     </div>
-                  );
-                })()}
-                ) : (
+                  ) : (
                   <div className="bg-white rounded-lg p-8 border border-gray-200 text-center">
                     <Building size={48} className="mx-auto text-gray-300 mb-4" />
                     <p className="text-gray-500 mb-4">No stores found. Create your first store to get started.</p>
