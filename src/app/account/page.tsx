@@ -347,10 +347,17 @@ export default function AccountPage() {
       }
 
       const data = await response.json();
-      setQrCodeUrl(data.url);
+
+      // Get presigned URL for preview
+      const urlParts = data.url.split('/');
+      const key = urlParts.slice(-2).join('/'); // Get the last two parts (e.g., temp/bank/userId_timestamp.png)
+      const presignedResponse = await fetch(`/api/files/presigned?key=${key}`);
+      const presignedData = await presignedResponse.json();
+
+      setQrCodeUrl(presignedData.presignedUrl || data.url);
       setNewStoreData(prev => ({
         ...prev,
-        bankUrl: data.url
+        bankUrl: data.url // Keep the S3 URL for storage, use presigned for display
       }));
 
     } catch (error) {
