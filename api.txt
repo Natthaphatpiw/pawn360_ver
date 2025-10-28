@@ -1,5 +1,32 @@
 ### 📋 **API Endpoints สำหรับระบบ LINE Integration:**
 
+## ⚡ **Asynchronous Architecture with Webhooks**
+
+ระบบนี้ออกแบบมาเป็น **Asynchronous (ไม่รอ response ทันที)** เพื่อหลีกเลี่ยงปัญหา timeout:
+
+### ระบบประกอบด้วย 2 ส่วน:
+- **Shop System (ระบบร้านค้า)**: `https://pawn360-ver.vercel.app/` - ระบบนี้
+- **Customer System (ระบบลูกค้า)**: `https://pawn360.vercel.app/` - ระบบที่เชื่อมกับ LINE
+
+### Workflow:
+1. ลูกค้ากดปุ่มใน LINE → Customer System ส่ง request มาที่ Shop System พร้อม **callbackUrl**
+2. Shop System ตอบกลับทันที (HTTP 200) โดยไม่รอพนักงานกดยืนยัน
+3. พนักงานเห็นแจ้งเตือนในหน้า `/monitor` และกดยืนยัน/ปฏิเสธ
+4. Shop System **POST webhook กลับไป callbackUrl** ของ Customer System พร้อมผลลัพธ์
+5. Customer System ส่ง LINE Flex Message Card พร้อม QR code ให้ลูกค้า
+6. ลูกค้าชำระเงินและอัพโหลดสลิป → Customer System ส่งสลิปมาที่ Shop System
+7. พนักงานตรวจสอบสลิปในหน้า `/monitor` และยืนยัน
+8. Shop System ส่ง webhook แจ้งผลการตรวจสอบกลับไปที่ Customer System
+9. Customer System ส่ง LINE message แจ้งลูกค้าว่าสำเร็จ
+
+**ข้อดี:**
+- ไม่เกิด timeout แม้พนักงานจะใช้เวลานาน
+- Webhook มี retry mechanism (ลองใหม่ 3 ครั้งด้วย exponential backoff)
+- มี webhook signature เพื่อความปลอดภัย
+- ระบบทั้ง 2 ทำงานอิสระกัน (decoupled)
+
+---
+
 ## 1. **POST /api/notifications/redemption**
 ### **รับคำขอไถ่ถอนจากลูกค้า**
 
@@ -10,13 +37,16 @@ Content-Type: application/json
 
 {
   "storeId": "651234567890abcdef12345",
-  "customerId": "651234567890abcdef12346", 
+  "customerId": "651234567890abcdef12346",
   "contractId": "651234567890abcdef12347",
   "customerName": "สมชาย ใจดี",
   "phone": "0812345678",
-  "message": "ต้องการไถ่ถอนทองคำที่จำนำไว้"
+  "message": "ต้องการไถ่ถอนทองคำที่จำนำไว้",
+  "callbackUrl": "https://your-line-system.com/webhooks/pawn360"
 }
 ```
+
+**Note:** `callbackUrl` (optional) คือ URL ที่ Pawn360 จะ POST กลับไปเมื่อพนักงานดำเนินการ
 
 **Response (Success):**
 ```json
@@ -47,14 +77,17 @@ Content-Type: application/json
 {
   "storeId": "651234567890abcdef12345",
   "customerId": "651234567890abcdef12346",
-  "contractId": "651234567890abcdef12347", 
+  "contractId": "651234567890abcdef12347",
   "customerName": "สมชาย ใจดี",
   "phone": "0812345678",
-  "message": "ต้องการต่อดอกเบี้ยเพิ่มอีก 7 วัน"
+  "message": "ต้องการต่อดอกเบี้ยเพิ่มอีก 7 วัน",
+  "callbackUrl": "https://your-line-system.com/webhooks/pawn360"
 }
 ```
 
 **Response:** เหมือนกับ redemption
+
+**Note:** `callbackUrl` (optional) คือ URL ที่ Pawn360 จะ POST กลับไปเมื่อพนักงานดำเนินการ
 
 ---
 
@@ -183,17 +216,216 @@ GET https://pawn360-ver.vercel.app/api/files/presigned?key=payment_proofs/651234
 
 ---
 
+## 7. **PUT /api/notifications/{id}/verify-payment**
+### **พนักงานตรวจสอบและยืนยันการชำระเงิน**
+
+**Request:**
+```bash
+PUT https://pawn360-ver.vercel.app/api/notifications/651234567890abcdef12348/verify-payment
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "verified": true,
+  "responseMessage": "ตรวจสอบการชำระเงินเรียบร้อยแล้ว"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "notification": {
+    "_id": "651234567890abcdef12348",
+    "status": "completed",
+    "verified": true,
+    "message": "ตรวจสอบการชำระเงินเรียบร้อยแล้ว"
+  }
+}
+```
+
+**Note:** Endpoint นี้จะส่ง webhook กลับไปยัง callbackUrl เพื่อแจ้งผลการตรวจสอบ
+
+---
+
+## 📡 **Webhook Payloads (ที่ Pawn360 จะส่งกลับไปยังระบบลูกค้า)**
+
+### Webhook 1: Action Response (Confirm/Reject)
+เกิดเมื่อพนักงานกดยืนยัน/ปฏิเสธคำขอ
+
+```json
+POST {callbackUrl}
+Content-Type: application/json
+X-Webhook-Signature: <signature>
+
+{
+  "notificationId": "651234567890abcdef12348",
+  "type": "action_response",
+  "data": {
+    "action": "confirm",
+    "confirmed": true,
+    "message": "ยอมรับคำขอไถ่ถอนแล้ว กรุณาชำระเงินตาม QR Code ที่แนบมา",
+    "qrCodeUrl": "https://pawn360.s3.ap-southeast-2.amazonaws.com/bank/...",
+    "storeId": "651234567890abcdef12345"
+  },
+  "timestamp": "2025-10-28T06:18:47.942Z"
+}
+```
+
+### Webhook 2: Payment Received
+เกิดเมื่อลูกค้าอัพโหลดสลิปการชำระเงิน
+
+```json
+POST {callbackUrl}
+Content-Type: application/json
+X-Webhook-Signature: <signature>
+
+{
+  "notificationId": "651234567890abcdef12348",
+  "type": "payment_received",
+  "data": {
+    "paymentProofUrl": "https://pawn360.s3.ap-southeast-2.amazonaws.com/payment_proofs/...",
+    "storeId": "651234567890abcdef12345",
+    "status": "payment_pending"
+  },
+  "timestamp": "2025-10-28T06:25:30.123Z"
+}
+```
+
+### Webhook 3: Payment Verified
+เกิดเมื่อพนักงานตรวจสอบและยืนยันการชำระเงิน
+
+```json
+POST {callbackUrl}
+Content-Type: application/json
+X-Webhook-Signature: <signature>
+
+{
+  "notificationId": "651234567890abcdef12348",
+  "type": "payment_received",
+  "data": {
+    "verified": true,
+    "message": "ตรวจสอบการชำระเงินเรียบร้อยแล้ว",
+    "storeId": "651234567890abcdef12345",
+    "status": "completed"
+  },
+  "timestamp": "2025-10-28T06:30:15.456Z"
+}
+```
+
+---
+
 ### 🔐 **Authentication:**
 - API ที่ต้อง authentication ใช้ JWT token ใน `Authorization: Bearer <token>` header
 - Token ได้มาจากการ login ผ่าน `/auth/login`
 
-### 📝 **Workflow สำหรับระบบ LINE:**
+### 🔒 **Webhook Security:**
+- ทุก webhook จะมี header `X-Webhook-Signature` เพื่อยืนยันความถูกต้อง
+- ระบบลูกค้าควรตรวจสอบ signature ก่อนประมวลผล webhook
+- Webhook มี retry mechanism: ลองส่งใหม่สูงสุด 3 ครั้งด้วย exponential backoff
 
-1. **ลูกค้าส่งคำขอ** → LINE POST ไปยัง redemption/extension API
-2. **พนักงานเห็นแจ้งเตือน** → เข้าดูในหน้า `/monitor` 
-3. **พนักงานยืนยัน** → PUT ไปยัง actions API → ได้ QR code presigned URL
-4. **LINE ส่ง QR code** → ให้ลูกค้าชำระเงิน
-5. **ลูกค้าอัพโหลดสลิป** → LINE POST ไปยัง payment-proof API
-6. **พนักงานตรวจสอบ** → ยืนยันการชำระเงินใน `/monitor`
+### 📝 **Workflow สำหรับระบบ LINE (Asynchronous):**
 
-ตอนนี้ระบบพร้อมใช้งานแล้ว! 🎉
+#### A. Customer System (https://pawn360.vercel.app/) → Shop System
+
+1. **ลูกค้ากดปุ่มใน LINE** → "ขอไถ่ถอนสัญญา"
+2. **Customer System ดึงข้อมูล** → ดึงข้อมูลสัญญาจาก database
+3. **POST ไปยัง Shop System** → `/api/notifications/redemption` พร้อม:
+   ```json
+   {
+     "storeId": "...",
+     "customerId": "...",
+     "contractId": "...",
+     "customerName": "สมชาย ใจดี",
+     "phone": "0812345678",
+     "message": "ต้องการไถ่ถอนสัญญา",
+     "callbackUrl": "https://pawn360.vercel.app/api/webhooks/shop-notification"
+   }
+   ```
+4. **Shop System ตอบกลับทันที** → `{ success: true, notificationId: "xxx" }` (ไม่รอพนักงาน)
+5. **Customer System reply ใน LINE** → "✅ ส่งคำขอแล้ว รอพนักงานดำเนินการ"
+
+#### B. พนักงานร้านดำเนินการ
+
+6. **พนักงานเห็นแจ้งเตือน** → เข้าดูในหน้า `/monitor` ของ Shop System
+7. **พนักงานกดยืนยัน/ปฏิเสธ** → PUT `/api/notifications/{id}/actions`
+   ```json
+   {
+     "action": "confirm",
+     "responseMessage": "ยอมรับคำขอแล้ว กรุณาชำระเงินตาม QR Code"
+   }
+   ```
+
+#### C. Shop System → Customer System (Webhook#1)
+
+8. **Shop System ส่ง webhook** → POST ไปที่ `https://pawn360.vercel.app/api/webhooks/shop-notification`
+   ```json
+   {
+     "notificationId": "xxx",
+     "type": "action_response",
+     "data": {
+       "action": "confirm",
+       "confirmed": true,
+       "message": "ยอมรับคำขอแล้ว",
+       "qrCodeUrl": "https://pawn360.s3.ap-southeast-2.amazonaws.com/bank/xxx.png",
+       "storeId": "...",
+       "customerId": "...",
+       "contractId": "..."
+     }
+   }
+   ```
+9. **Customer System รับ webhook** → ส่ง LINE Flex Message Card พร้อม QR code ให้ลูกค้า
+
+#### D. ลูกค้าชำระเงินและอัพโหลดสลิป
+
+10. **ลูกค้าสแกน QR** → ชำระเงินผ่านธนาคาร
+11. **ลูกค้ากดปุ่ม "อัพโหลดสลิป"** → ส่งรูปสลิปใน LINE
+12. **Customer System ดาวน์โหลดรูป** → จาก LINE Content API
+13. **POST ไปยัง Shop System** → `/api/notifications/payment-proof` (multipart/form-data)
+14. **Shop System บันทึกสลิป** → อัพโหลดไป S3 และเปลี่ยนสถานะเป็น `payment_pending`
+
+#### E. Shop System → Customer System (Webhook#2 - Optional)
+
+15. **Shop System ส่ง webhook** → แจ้งว่าได้รับสลิปแล้ว
+16. **Customer System ส่ง LINE** → "✅ อัพโหลดสลิปสำเร็จ กำลังรอพนักงานตรวจสอบ"
+
+#### F. พนักงานตรวจสอบสลิป
+
+17. **พนักงานดูสลิปในหน้า `/monitor`** → ตรวจสอบความถูกต้อง
+18. **พนักงานกดยืนยัน** → PUT `/api/notifications/{id}/verify-payment`
+   ```json
+   {
+     "verified": true,
+     "responseMessage": "ตรวจสอบการชำระเงินเรียบร้อยแล้ว"
+   }
+   ```
+
+#### G. Shop System → Customer System (Webhook#3)
+
+19. **Shop System ส่ง webhook** → POST ผลการตรวจสอบ
+   ```json
+   {
+     "notificationId": "xxx",
+     "type": "payment_verified",
+     "data": {
+       "verified": true,
+       "message": "ตรวจสอบการชำระเงินเรียบร้อยแล้ว",
+       "status": "completed"
+     }
+   }
+   ```
+20. **Customer System อัพเดทสถานะสัญญา** → เปลี่ยนเป็น `completed`
+21. **Customer System ส่ง LINE** → "✅ การชำระเงินสำเร็จ! สัญญาของคุณเสร็จสิ้นแล้ว"
+22. **เสร็จสิ้น** 🎉
+
+---
+
+### 🎯 **Key Benefits of Asynchronous Design:**
+
+- **ไม่มีปัญหา timeout:** API ตอบกลับทันที ไม่รอ user action
+- **Scalability:** รองรับ concurrent requests ได้มาก
+- **Reliability:** Webhook retry mechanism ป้องกันข้อมูลสูญหาย
+- **Decoupling:** ระบบ Pawn360 และ LINE ทำงานอิสระกัน
+- **Better UX:** พนักงานไม่รู้สึก "กดแล้วต้องรอ" เพราะ response เป็น background process
+
+ตอนนี้ระบบพร้อมใช้งานแบบ **Asynchronous** แล้ว! 🎉🚀

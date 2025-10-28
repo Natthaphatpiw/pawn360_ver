@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { sendPaymentReceivedWebhook } from '@/lib/webhook';
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'ap-southeast-2',
@@ -91,6 +92,32 @@ export async function POST(request: NextRequest) {
         }
       }
     );
+
+    // Send webhook to notify external system (LINE) that payment proof was received
+    // This runs asynchronously in the background
+    if (notification.callbackUrl) {
+      console.log(`[PaymentProof] Sending webhook to ${notification.callbackUrl}`);
+
+      // Fire and forget - don't await (truly asynchronous)
+      sendPaymentReceivedWebhook(
+        notification.callbackUrl,
+        notificationId,
+        publicUrl,
+        notification.storeId.toString(),
+        notification.customerId.toString(),
+        notification.contractId.toString()
+      ).then((result) => {
+        if (result.success) {
+          console.log(`[PaymentProof] Webhook sent successfully for notification ${notificationId}`);
+        } else {
+          console.error(`[PaymentProof] Webhook failed for notification ${notificationId}:`, result.error);
+        }
+      }).catch((error) => {
+        console.error(`[PaymentProof] Webhook error for notification ${notificationId}:`, error);
+      });
+    } else {
+      console.warn(`[PaymentProof] No callbackUrl for notification ${notificationId}, skipping webhook`);
+    }
 
     return NextResponse.json({
       success: true,

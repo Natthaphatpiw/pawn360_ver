@@ -8,13 +8,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate required fields
-    const { storeId, customerId, contractId, message, customerName, phone } = body;
+    const { storeId, customerId, contractId, message, customerName, phone, callbackUrl } = body;
 
     if (!storeId || !customerId || !contractId) {
       return NextResponse.json(
         { error: 'Missing required fields: storeId, customerId, contractId' },
         { status: 400 }
       );
+    }
+
+    // Validate callbackUrl if provided
+    if (callbackUrl) {
+      try {
+        new URL(callbackUrl);
+      } catch (e) {
+        return NextResponse.json(
+          { error: 'Invalid callbackUrl format' },
+          { status: 400 }
+        );
+      }
     }
 
     // Create notification document
@@ -27,6 +39,7 @@ export async function POST(request: NextRequest) {
       message: message || '',
       customerName: customerName || '',
       phone: phone || '',
+      callbackUrl: callbackUrl || '', // Store callback URL for webhook
       responseMessage: '',
       qrCodeUrl: '',
       paymentProofUrl: '',

@@ -5,6 +5,7 @@ import { ObjectId } from 'mongodb';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3Client } from '@aws-sdk/client-s3';
+import { sendActionResponseWebhook } from '@/lib/webhook';
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'ap-southeast-2',
@@ -116,9 +117,33 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       timestamp: new Date().toISOString()
     };
 
-    // Here you would typically send this response to the external LINE service
-    // For now, we'll just return it
-    // TODO: Implement webhook call to external service
+    // Send webhook to external system (LINE) asynchronously
+    // This runs in the background and doesn't block the response
+    if (notification.callbackUrl) {
+      console.log(`[Actions] Sending webhook to ${notification.callbackUrl}`);
+
+      // Fire and forget - don't await (truly asynchronous)
+      sendActionResponseWebhook(
+        notification.callbackUrl,
+        id,
+        action,
+        responseMessage || '',
+        action === 'confirm' ? qrCodeUrl : null,
+        store._id.toString(),
+        notification.customerId.toString(),
+        notification.contractId.toString()
+      ).then((result) => {
+        if (result.success) {
+          console.log(`[Actions] Webhook sent successfully for notification ${id}`);
+        } else {
+          console.error(`[Actions] Webhook failed for notification ${id}:`, result.error);
+        }
+      }).catch((error) => {
+        console.error(`[Actions] Webhook error for notification ${id}:`, error);
+      });
+    } else {
+      console.warn(`[Actions] No callbackUrl for notification ${id}, skipping webhook`);
+    }
 
     return NextResponse.json({
       success: true,
