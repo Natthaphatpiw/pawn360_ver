@@ -74,6 +74,7 @@ export default function AccountPage() {
   const [qrCodeUploading, setQrCodeUploading] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [editingStoreData, setEditingStoreData] = useState<any>(null);
+  const [currentStore, setCurrentStore] = useState<any>(null);
 
   const [newStoreData, setNewStoreData] = useState<StoreData>({
     storeName: '',
@@ -452,14 +453,17 @@ export default function AccountPage() {
     );
   }
 
-  // Get current store safely
-  const getCurrentStore = () => {
-    if (userStores.length === 0) return null;
+  // Update currentStore when userStores or selectedStoreIndex changes
+  useEffect(() => {
+    if (userStores.length === 0) {
+      setCurrentStore(null);
+      return;
+    }
     const validIndex = Math.min(selectedStoreIndex, userStores.length - 1);
-    return userStores[validIndex] || userStores[0] || null;
-  };
-
-  const currentStore = getCurrentStore();
+    const store = userStores[validIndex] || userStores[0] || null;
+    setCurrentStore(store);
+    console.log('Current store updated:', validIndex, store?.storeName, userStores.length, 'selectedIndex:', selectedStoreIndex);
+  }, [userStores, selectedStoreIndex]);
 
   return (
     <FixedLayout>
@@ -579,6 +583,7 @@ export default function AccountPage() {
                                   className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded text-sm cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    console.log('Selecting store:', index, store.storeName);
                                     setSelectedStoreIndex(index);
                                     setShowStoreDropdown(false);
                                   }}
@@ -609,7 +614,7 @@ export default function AccountPage() {
                 </div>
 
                 {currentStore && currentStore._id ? (
-                  <div key={currentStore._id}>
+                  <div key={`store-${currentStore._id}-${selectedStoreIndex}`}>
                     {/* General Section */}
                     <div className="bg-[#ffffff] rounded-lg p-6 border border-gray-200">
                       <div className="flex items-center gap-1 mb-4">

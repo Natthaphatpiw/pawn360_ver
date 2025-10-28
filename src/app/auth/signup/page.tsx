@@ -126,9 +126,7 @@ export default function SignUpPage() {
 
       const response = await fetch('/api/upload', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
+        // No Authorization header for temporary uploads during signup
         body: formDataUpload,
       });
 

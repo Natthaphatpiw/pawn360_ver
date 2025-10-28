@@ -38,15 +38,20 @@ async function uploadToS3(file: File, key: string): Promise<string> {
 // POST /api/upload - Upload file to S3
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromToken(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const formData = await request.formData();
+    const storeId = formData.get('storeId') as string;
+
+    // For temporary uploads (during signup), skip authentication
+    let userId = null;
+    if (storeId !== 'temp') {
+      userId = getUserIdFromToken(request);
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
-    const formData = await request.formData();
     const file = formData.get('file') as File;
     const type = formData.get('type') as string; // 'logo', 'signature', 'bank', etc.
-    const storeId = formData.get('storeId') as string;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
