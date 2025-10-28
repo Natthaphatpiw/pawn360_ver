@@ -452,12 +452,12 @@ export default function AccountPage() {
     );
   }
 
-  // Calculate current store synchronously (safer than useEffect)
-  const currentStore = useMemo(() => {
+  // Get current store safely (computed synchronously)
+  const getCurrentStore = () => {
     if (!userStores || userStores.length === 0) return null;
     const validIndex = Math.min(selectedStoreIndex, userStores.length - 1);
     return userStores[validIndex] || userStores[0] || null;
-  }, [userStores, selectedStoreIndex]);
+  };
 
   return (
     <FixedLayout>
@@ -607,8 +607,10 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                {currentStore && currentStore._id ? (
-                  <div key={`store-${currentStore._id}-${selectedStoreIndex}`}>
+                {(() => {
+                  const currentStore = getCurrentStore();
+                  return currentStore && currentStore._id ? (
+                    <div key={`store-${currentStore._id}`}>
                     {/* General Section */}
                     <div className="bg-[#ffffff] rounded-lg p-6 border border-gray-200">
                       <div className="flex items-center gap-1 mb-4">
@@ -817,7 +819,9 @@ export default function AccountPage() {
                         )}
                       </div>
                     </div>
-                  </div>
+                    </div>
+                  ) : null;
+                })()}
                 ) : (
                   <div className="bg-white rounded-lg p-8 border border-gray-200 text-center">
                     <Building size={48} className="mx-auto text-gray-300 mb-4" />
