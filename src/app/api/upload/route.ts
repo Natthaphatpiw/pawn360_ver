@@ -21,13 +21,13 @@ async function uploadToS3(file: File, key: string): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: key,
-    Body: buffer,
-    ContentType: file.type,
-    ACL: 'public-read', // Make file publicly accessible
-  });
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: file.type,
+      // Remove ACL - use bucket policy or presigned URLs instead
+    });
 
   await s3Client.send(command);
 

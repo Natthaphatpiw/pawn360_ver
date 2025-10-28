@@ -2,6 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { getUserIdFromToken } from '@/lib/auth';
 import { ObjectId } from 'mongodb';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3Client } from '@aws-sdk/client-s3';
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION || 'ap-southeast-2',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+  },
+});
+
+const BUCKET_NAME = process.env.AWS_S3_BUCKET || 'piwp360';
+
+// Helper function to generate presigned URL
+async function generatePresignedUrl(key: string): Promise<string> {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    const presignedUrl = await getSignedUrl(s3Client, command, {
+      expiresIn: 3600, // 1 hour
+    });
+
+    return presignedUrl;
+  } catch (error) {
+    console.error('Failed to generate presigned URL:', error);
+    return '';
+  }
+}
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -48,8 +80,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
-    // Get QR code URL for the store
-    const qrCodeUrl = store.bankUrl || `https://piwp360.s3.ap-southeast-2.amazonaws.com/bank/${store._id.toString()}.png`;
+    // Get QR code URL for the store (generate presigned URL)
+    let qrCodeUrl = '';
+    if (store.bankUrl) {
+      // If bankUrl is already a full URL, extract the key
+      const urlParts = store.bankUrl.split('/');
+      const key = urlParts[urlParts.length - 1];
+      qrCodeUrl = await generatePresignedUrl(`bank/${key}`);
+    } else {
+      // Fallback to store ID based QR code
+      qrCodeUrl = await generatePresignedUrl(`bank/${store._id.toString()}.png`);
+    }
 
     // Update notification
     const updateData: any = {
