@@ -76,13 +76,13 @@ export async function POST(request: NextRequest) {
     let key = '';
     switch (type) {
       case 'logo':
-        key = `shop_logo/${storeId}.png`;
+        key = storeId === 'temp' ? `temp/shop_logo/${userId}_${Date.now()}.png` : `shop_logo/${storeId}.png`;
         break;
       case 'signature':
-        key = `shop_signature/${storeId}.png`;
+        key = storeId === 'temp' ? `temp/shop_signature/${userId}_${Date.now()}.png` : `shop_signature/${storeId}.png`;
         break;
       case 'bank':
-        key = `bank/${storeId}.png`; // Store-specific QR code
+        key = storeId === 'temp' ? `temp/bank/${userId}_${Date.now()}.png` : `bank/${storeId}.png`; // Store-specific QR code
         break;
       default:
         return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
@@ -94,7 +94,18 @@ export async function POST(request: NextRequest) {
     // Update store with the file URL
     const db = await getDatabase();
 
-    // Verify store ownership
+    // Handle temporary uploads (for signup/account before store creation)
+    if (storeId === 'temp') {
+      // For temporary uploads, just return the URL without database operations
+      return NextResponse.json({
+        success: true,
+        url: fileUrl,
+        type,
+        message: 'File uploaded successfully (temporary)'
+      });
+    }
+
+    // Verify store ownership for regular uploads
     const store = await db.collection('stores').findOne({
       _id: new ObjectId(storeId),
       ownerId: new ObjectId(userId)
