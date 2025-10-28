@@ -571,11 +571,12 @@ export default function AccountPage() {
                           >
                             <div className="space-y-1">
                               {userStores.map((store, index) => (
-                                <label
+                                <div
                                   key={store._id}
                                   className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded text-sm cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    e.preventDefault();
                                     console.log('Selecting store:', index, store.storeName);
                                     setSelectedStoreIndex(index);
                                     setShowStoreDropdown(false);
@@ -585,11 +586,11 @@ export default function AccountPage() {
                                     type="radio"
                                     name="storeSelection"
                                     checked={selectedStoreIndex === index}
-                                    readOnly
-                                    className="w-4 h-4"
+                                    onChange={() => {}}
+                                    className="w-4 h-4 pointer-events-none"
                                   />
                                   <span>🏪 {store.storeName || `Store ${index + 1}`}</span>
-                                </label>
+                                </div>
                               ))}
                             </div>
                           </div>
