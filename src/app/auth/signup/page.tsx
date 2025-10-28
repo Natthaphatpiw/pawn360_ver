@@ -57,6 +57,7 @@ export default function SignUpPage() {
   const [error, setError] = useState('');
   const [qrCodeUploading, setQrCodeUploading] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [qrCodeFile, setQrCodeFile] = useState<File | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -99,7 +100,7 @@ export default function SignUpPage() {
     }));
   };
 
-  // Handle QR Code upload
+  // Handle QR Code upload - Just preview, actual upload happens after signup
   const handleQrCodeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -116,48 +117,17 @@ export default function SignUpPage() {
       return;
     }
 
-    setQrCodeUploading(true);
-
-    try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
-      formDataUpload.append('type', 'bank');
-      formDataUpload.append('storeId', 'temp'); // Temporary store ID, will be updated after store creation
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        // No Authorization header for temporary uploads during signup
-        body: formDataUpload,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const data = await response.json();
-
-      // Get presigned URL for preview
-      const urlParts = data.url.split('/');
-      const key = urlParts.slice(-2).join('/'); // Get the last two parts (e.g., temp/bank/userId_timestamp.png)
-      const presignedResponse = await fetch(`/api/files/presigned?key=${key}`);
-      const presignedData = await presignedResponse.json();
-
-      setQrCodeUrl(presignedData.presignedUrl || data.url);
-      setFormData(prev => ({
-        ...prev,
-        bankUrl: data.url // Keep the S3 URL for storage, use presigned for display
-      }));
-
-    } catch (error) {
-      console.error('QR Code upload error:', error);
-      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setQrCodeUploading(false);
-      // Reset input
-      event.target.value = '';
-    }
+    // Store the file for later upload after signup
+    setQrCodeFile(file);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setQrCodeUrl(previewUrl);
+    
+    // Reset input
+    event.target.value = '';
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,6 +180,37 @@ export default function SignUpPage() {
       const data = await response.json();
 
       if (response.ok) {
+        // Step 2: Upload QR code if file exists
+        if (qrCodeFile && data.store && data.store._id) {
+          try {
+            const formDataUpload = new FormData();
+            formDataUpload.append('file', qrCodeFile);
+            formDataUpload.append('type', 'bank');
+            formDataUpload.append('storeId', data.store._id); // Use actual store ID
+
+            const uploadResponse = await fetch('/api/upload', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${data.access_token}`,
+              },
+              body: formDataUpload,
+            });
+
+            if (uploadResponse.ok) {
+              const uploadData = await uploadResponse.json();
+              // Update store data with actual QR code URL
+              if (data.store) {
+                data.store.bankUrl = uploadData.url;
+              }
+            } else {
+              console.error('QR upload failed');
+            }
+          } catch (uploadErr) {
+            console.error('QR upload error:', uploadErr);
+            // Continue even if QR upload fails
+          }
+        }
+
         // Store token if provided
         if (data.access_token) {
           localStorage.setItem('isAuthenticated', 'true');

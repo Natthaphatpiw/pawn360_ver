@@ -394,6 +394,38 @@ export default function AccountPage() {
 
     try {
       const token = localStorage.getItem('access_token');
+      
+      // Step 1: Upload QR code if there's a new file
+      let updatedBankUrl = editingStoreData.bankUrl;
+      if (qrCodeFile) {
+        try {
+          const formDataUpload = new FormData();
+          formDataUpload.append('file', qrCodeFile);
+          formDataUpload.append('type', 'bank');
+          formDataUpload.append('storeId', currentStore._id);
+
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formDataUpload,
+          });
+
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            updatedBankUrl = uploadData.url;
+          } else {
+            console.error('QR upload failed');
+            alert('อัพโหลด QR Code ไม่สำเร็จ แต่จะบันทึกข้อมูลอื่นต่อ');
+          }
+        } catch (uploadErr) {
+          console.error('QR upload error:', uploadErr);
+          alert('อัพโหลด QR Code ไม่สำเร็จ แต่จะบันทึกข้อมูลอื่นต่อ');
+        }
+      }
+      
+      // Step 2: Update store data
       const response = await fetch(`/api/stores/${currentStore._id}`, {
         method: 'PUT',
         headers: {
@@ -406,7 +438,7 @@ export default function AccountPage() {
           tax_id: editingStoreData.taxId,
           address: editingStoreData.address,
           googlemap: editingStoreData.googlemap,
-          bankUrl: editingStoreData.bankUrl,
+          bankUrl: updatedBankUrl, // Use updated URL if QR was uploaded
           interestPerday: editingStoreData.interestPerday,
           interestSet: editingStoreData.interestSet,
           interestPresets: editingStoreData.interestPresets,
@@ -416,7 +448,7 @@ export default function AccountPage() {
       });
 
       if (response.ok) {
-        // Refresh stores data
+        // Step 3: Refresh stores data
         const storesResponse = await fetch('/api/stores', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -429,6 +461,10 @@ export default function AccountPage() {
           setUserStores(stores);
         }
 
+        // Clear QR code state
+        setQrCodeFile(null);
+        setQrCodeUrl('');
+        
         setIsEditing(false);
         setEditingStoreData(null);
         alert('บันทึกข้อมูลเรียบร้อยแล้ว');
@@ -445,6 +481,8 @@ export default function AccountPage() {
   const cancelEditing = () => {
     setIsEditing(false);
     setEditingStoreData(null);
+    setQrCodeFile(null);
+    setQrCodeUrl('');
   };
 
   const TitleBadge = ({ text }: { text: string }) => (
@@ -749,47 +787,120 @@ export default function AccountPage() {
                       </div>
 
                       <div className="space-y-4">
-                        {currentStore.bankUrl ? (
-                          <div className="flex items-center gap-4">
-                            <div>
-                              <label className="text-sm font-medium text-gray-900 block">Bank QR Code</label>
-                              <div className="text-xs text-gray-500 mb-2">คิวอาร์โค้ดสำหรับการชำระเงิน</div>
-                            </div>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const urlParts = currentStore.bankUrl.split('/');
-                                  const key = urlParts.slice(-2).join('/');
-                                  const response = await fetch(`/api/files/presigned?key=${key}`);
-                                  const data = await response.json();
+                        {isEditing ? (
+                          // Edit mode: Show upload area
+                          <div>
+                            <label className="text-sm font-medium text-gray-900 block mb-3">
+                              Bank QR Code
+                              <span className="text-xs text-gray-500 ml-2">อัพโหลดใหม่เพื่อแทนที่ QR Code เดิม</span>
+                            </label>
+                            <div className="flex items-center gap-4">
+                              <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                                {qrCodeUploading ? (
+                                  <div className="flex flex-col items-center">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                                    <span className="text-xs text-gray-500 mt-1">Uploading...</span>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <Upload size={24} className="text-gray-400" />
+                                    <span className="text-xs text-gray-500 mt-1">Upload QR</span>
+                                  </>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleQrCodeUpload}
+                                  disabled={qrCodeUploading}
+                                  className="hidden"
+                                />
+                              </label>
 
-                                  if (data.presignedUrl) {
-                                    window.open(data.presignedUrl, '_blank');
-                                  } else {
-                                    alert('ไม่สามารถเข้าถึง QR Code ได้');
-                                  }
-                                } catch (error) {
-                                  alert('เกิดข้อผิดพลาดในการโหลด QR Code');
-                                }
-                              }}
-                              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                              ดู QR Code
-                            </button>
+                              {qrCodeUrl && (
+                                <div className="flex flex-col items-center">
+                                  <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-green-500">
+                                    <img
+                                      src={qrCodeUrl}
+                                      alt="QR Code Preview"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                  <span className="text-xs text-green-600 mt-1">Preview</span>
+                                </div>
+                              )}
+
+                              {currentStore.bankUrl && !qrCodeUrl && (
+                                <div className="text-xs text-gray-500">
+                                  <div>✓ มี QR Code อยู่แล้ว</div>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        const urlParts = currentStore.bankUrl.split('/');
+                                        const key = urlParts.slice(-2).join('/');
+                                        const response = await fetch(`/api/files/presigned?key=${key}`);
+                                        const data = await response.json();
+                                        if (data.presignedUrl) {
+                                          window.open(data.presignedUrl, '_blank');
+                                        }
+                                      } catch (error) {
+                                        alert('เกิดข้อผิดพลาด');
+                                      }
+                                    }}
+                                    className="text-blue-500 hover:underline mt-1"
+                                  >
+                                    ดู QR Code เดิม
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ) : (
-                          <div className="text-center py-8">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 15h4.01M12 21h4.01M12 18h4.01M12 9h4.01M12 6h4.01" />
-                              </svg>
-                            </div>
-                            <p className="text-gray-500 text-sm">ยังไม่ได้ตั้งค่า QR Code สำหรับร้านนี้</p>
-                          </div>
+                          // View mode: Show QR code or empty state
+                          <>
+                            {currentStore.bankUrl ? (
+                              <div className="flex items-center gap-4">
+                                <div>
+                                  <label className="text-sm font-medium text-gray-900 block">Bank QR Code</label>
+                                  <div className="text-xs text-gray-500 mb-2">คิวอาร์โค้ดสำหรับการชำระเงิน</div>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const urlParts = currentStore.bankUrl.split('/');
+                                      const key = urlParts.slice(-2).join('/');
+                                      const response = await fetch(`/api/files/presigned?key=${key}`);
+                                      const data = await response.json();
+
+                                      if (data.presignedUrl) {
+                                        window.open(data.presignedUrl, '_blank');
+                                      } else {
+                                        alert('ไม่สามารถเข้าถึง QR Code ได้');
+                                      }
+                                    } catch (error) {
+                                      alert('เกิดข้อผิดพลาดในการโหลด QR Code');
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  ดู QR Code
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 15h4.01M12 21h4.01M12 18h4.01M12 9h4.01M12 6h4.01" />
+                                  </svg>
+                                </div>
+                                <p className="text-gray-500 text-sm">ยังไม่ได้ตั้งค่า QR Code สำหรับร้านนี้</p>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
