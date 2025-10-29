@@ -133,8 +133,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                 totalPaid: calculation.totalPayment,
                 daysSinceLastCutoff: daysSinceLastCutoff,
                 notificationId: new ObjectId(id)
-              }
-            }
+              } as any
+            } as any
           }
         );
 
@@ -169,8 +169,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                 interestCutoff: interestCutoff.interestAmount,
                 daysSinceLastCutoff: daysSinceLastCutoff,
                 notificationId: new ObjectId(id)
-              }
-            }
+              } as any
+            } as any
           }
         );
 
