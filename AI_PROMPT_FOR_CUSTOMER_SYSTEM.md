@@ -1,5 +1,10 @@
 # 🤖 Prompt สำหรับ Claude Code AI: สร้างระบบลูกค้า (Customer System)
 
+⚠️ **DEPRECATED**: เอกสารนี้เป็นเวอร์ชันเก่า กรุณาใช้ [AI_PROMPT_COMPLETE_CUSTOMER_SYSTEM.md](./AI_PROMPT_COMPLETE_CUSTOMER_SYSTEM.md) แทน ซึ่งมี:
+- Schema ที่ถูกต้อง (collection `items`, field `desiredAmount`, `loanDays`)
+- รองรับ 4 transaction types (redemption, extension, reduce principal, increase principal)
+- มี validation warnings และ checklist
+
 ---
 
 ## 📋 Context

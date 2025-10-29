@@ -1,0 +1,129 @@
+สำเร็จแล้ว! ผมได้สร้างระบบสื่อสารแบบ Asynchronous ระหว่าง 2 ระบบสมบูรณ์แล้ว
+📋 สรุปสิ่งที่ได้ทำ:
+1. อัพเดทระบบร้านค้า (Shop System - ระบบนี้)
+ไฟล์ที่แก้ไข:
+src/lib/webhook.ts - เพิ่มการส่ง customerId, contractId ในทุก webhook
+src/app/api/notifications/redemption/route.ts - รับ callbackUrl
+src/app/api/notifications/extension/route.ts - รับ callbackUrl
+src/app/api/notifications/[id]/actions/route.ts - ส่ง webhook เมื่อยืนยัน/ปฏิเสธ
+src/app/api/notifications/payment-proof/route.ts - ส่ง webhook เมื่อรับสลิป
+src/app/api/notifications/[id]/verify-payment/route.ts - ส่ง webhook เมื่อตรวจสอบสลิป
+api.txt - อัพเดทเอกสาร API แบบสมบูรณ์
+2. สร้างเอกสารสำหรับระบบลูกค้า
+ไฟล์ที่สร้างใหม่:
+CUSTOMER_SYSTEM_API_SPEC.md - เอกสาร spec ครบถ้วน
+AI_PROMPT_FOR_CUSTOMER_SYSTEM.md - Prompt สำหรับ AI สร้างระบบลูกค้า
+🔄 การทำงานของระบบ:
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Complete Flow                                │
+└──────────────────────────────────────────────────────────────────────┘
+
+[ลูกค้า] กดปุ่มใน LINE "ขอไถ่ถอน"
+   ↓
+[Customer System] https://pawn360.vercel.app/
+   - ดึงข้อมูลสัญญา
+   - POST → /api/notifications/redemption
+   ↓
+[Shop System] https://pawn360-ver.vercel.app/
+   - บันทึก notification
+   - ตอบกลับทันที: { notificationId: "xxx" }
+   ↓
+[Customer System]
+   - Reply LINE: "✅ ส่งคำขอแล้ว รอพนักงาน"
+   
+--- รอพนักงาน (ไม่มี timeout) ---
+
+[พนักงาน] เข้าหน้า /monitor เห็นแจ้งเตือน
+   ↓
+[พนักงาน] กดยืนยัน + พิมพ์ข้อความ
+   ↓
+[Shop System]
+   - บันทึก status = confirmed
+   - ส่ง webhook → https://pawn360.vercel.app/api/webhooks/shop-notification
+   ↓
+[Customer System]
+   - รับ webhook พร้อม QR code URL
+   - ส่ง LINE Flex Message Card พร้อม QR code
+   ↓
+[ลูกค้า] สแกน QR → ชำระเงิน → อัพโหลดสลิป
+   ↓
+[Customer System]
+   - ดาวน์โหลดรูปจาก LINE
+   - POST → /api/notifications/payment-proof
+   ↓
+[Shop System]
+   - อัพโหลดสลิปไป S3
+   - ส่ง webhook แจ้งว่าได้รับสลิป (optional)
+   
+--- รอพนักงานตรวจสอบสลิป ---
+
+[พนักงาน] ดูสลิปในหน้า /monitor → กดยืนยัน
+   ↓
+[Shop System]
+   - บันทึก status = completed
+   - ส่ง webhook → verified: true
+   ↓
+[Customer System]
+   - อัพเดทสัญญาเป็น completed
+   - ส่ง LINE: "✅ ชำระสำเร็จ สัญญาเสร็จสิ้น"
+   ↓
+✅ เสร็จสมบูรณ์
+📁 ไฟล์สำคัญที่สร้าง:
+1. CUSTOMER_SYSTEM_API_SPEC.md
+เอกสาร specification ที่ระบุว่าระบบลูกค้าต้องสร้าง:
+API endpoints ทั้งหมด (7 endpoints)
+LINE Flex Message templates
+Database schema
+Security implementation
+Webhook verification
+LINE API integration
+2. AI_PROMPT_FOR_CUSTOMER_SYSTEM.md
+Prompt พร้อมใช้สำหรับ Claude Code AI ที่มี:
+Context และวัตถุประสงค์
+Code examples ครบถ้วน
+TypeScript interfaces
+LINE API integration code
+Security implementations
+File structure
+Testing workflow
+Environment variables
+🚀 วิธีใช้ Prompt:
+Copy prompt ทั้งหมดจากไฟล์ AI_PROMPT_FOR_CUSTOMER_SYSTEM.md
+เปิด repo ของระบบลูกค้า (https://pawn360.vercel.app/)
+Paste prompt ให้ Claude Code AI ในอีก repo นั้น
+AI จะสร้างโค้ดทั้งหมดให้อัตโนมัติ:
+API routes ทั้งหมด
+LINE webhook handler
+Webhook security
+Database models
+Utility functions
+Type definitions
+✅ Checklist สำหรับระบบลูกค้า:
+ระบบลูกค้าต้องสร้าง:
+ POST /api/webhooks/shop-notification (รับ webhook จาก Shop System)
+ POST /api/line/webhook (รับ events จาก LINE)
+ POST /api/customer/request-redemption
+ POST /api/customer/request-extension
+ POST /api/customer/upload-payment-proof
+ LINE Flex Message Templates (3 templates)
+ Webhook signature verification
+ LINE signature verification
+ Database schema (notifications, contracts)
+ Environment variables (.env.local)
+🔐 Environment Variables ที่ต้องเพิ่ม:
+ระบบร้านค้า (.env):
+CUSTOMER_SYSTEM_URL=https://pawn360.vercel.app
+WEBHOOK_SECRET=pawn360-webhook-secret
+ระบบลูกค้า (.env.local):
+SHOP_SYSTEM_URL=https://pawn360-ver.vercel.app
+WEBHOOK_SECRET=pawn360-webhook-secret
+LINE_CHANNEL_ACCESS_TOKEN=your_token
+LINE_CHANNEL_SECRET=your_secret
+🎯 ข้อดีของระบบนี้:
+ไม่มี timeout: API ตอบกลับทันที ไม่รอ user action
+Scalable: รองรับ concurrent requests ได้มาก
+Reliable: Webhook retry 3 ครั้งด้วย exponential backoff
+Secure: มี webhook signature verification
+Decoupled: ทั้ง 2 ระบบทำงานอิสระกัน
+LINE Integration: ส่ง Flex Message Card สวยงาม
+ตอนนี้คุณมีเอกสารครบถ้วนสำหรับสร้างระบบลูกค้าแล้ว! แค่เอา prompt ไปใช้กับ Claude Code AI ในอีก repo ก็สามารถสร้างระบบได้เลย! 🎉

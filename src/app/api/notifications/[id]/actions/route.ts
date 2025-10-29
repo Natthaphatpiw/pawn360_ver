@@ -82,22 +82,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Get QR code URL for the store (generate presigned URL)
+    // สำหรับ redemption, extension, reduce_principal ต้องส่ง QR code
+    // สำหรับ increase_principal ไม่ต้องส่ง QR code (ลูกค้ารับเงิน)
     let qrCodeUrl = '';
-    if (store.bankUrl) {
-      // If bankUrl is already a full URL, extract the key
-      const urlParts = store.bankUrl.split('/');
-      const key = urlParts[urlParts.length - 1];
-      qrCodeUrl = await generatePresignedUrl(`bank/${key}`);
-    } else {
-      // Fallback to store ID based QR code
-      qrCodeUrl = await generatePresignedUrl(`bank/${store._id.toString()}.png`);
+    const needsQRCode = ['redemption', 'extension', 'reduce_principal'].includes(notification.type);
+
+    if (action === 'confirm' && needsQRCode) {
+      if (store.bankUrl) {
+        // If bankUrl is already a full URL, extract the key
+        const urlParts = store.bankUrl.split('/');
+        const key = urlParts[urlParts.length - 1];
+        qrCodeUrl = await generatePresignedUrl(`bank/${key}`);
+      } else {
+        // Fallback to store ID based QR code
+        qrCodeUrl = await generatePresignedUrl(`bank/${store._id.toString()}.png`);
+      }
     }
 
     // Update notification
     const updateData: any = {
       status: action === 'confirm' ? 'confirmed' : 'rejected',
       responseMessage: responseMessage || '',
-      qrCodeUrl: action === 'confirm' ? qrCodeUrl : '',
+      qrCodeUrl: qrCodeUrl,
       updatedAt: new Date()
     };
 

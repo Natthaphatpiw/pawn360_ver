@@ -8,6 +8,12 @@
 - **Shop System (ระบบร้านค้า)**: `https://pawn360-ver.vercel.app/` - ระบบนี้
 - **Customer System (ระบบลูกค้า)**: `https://pawn360.vercel.app/` - ระบบที่เชื่อมกับ LINE
 
+### รองรับ 4 ประเภทการทำรายการ:
+1. **Redemption** - ไถ่ถอนสัญญา
+2. **Extension** - ต่อดอกเบี้ย
+3. **Reduce Principal** - ลดเงินต้น (จ่ายคืนบางส่วน)
+4. **Increase Principal** - เพิ่มเงินต้น (ขอวงเงินเพิ่ม)
+
 ### Workflow:
 1. ลูกค้ากดปุ่มใน LINE → Customer System ส่ง request มาที่ Shop System พร้อม **callbackUrl**
 2. Shop System ตอบกลับทันที (HTTP 200) โดยไม่รอพนักงานกดยืนยัน
@@ -217,7 +223,7 @@ GET https://pawn360-ver.vercel.app/api/files/presigned?key=payment_proofs/651234
 ---
 
 ## 7. **PUT /api/notifications/{id}/verify-payment**
-### **พนักงานตรวจสอบและยืนยันการชำระเงิน**
+### **พนักงานตรวจสอบและยืนยันการชำระเงิน (สำหรับ redemption/extension)**
 
 **Request:**
 ```bash
@@ -244,7 +250,118 @@ Content-Type: application/json
 }
 ```
 
-**Note:** Endpoint นี้จะส่ง webhook กลับไปยัง callbackUrl เพื่อแจ้งผลการตรวจสอบ
+**Note:**
+- สำหรับ **extension**: จะอัพเดท `dueDate` ของสัญญา (เพิ่มจำนวนวันตามสัญญา)
+- สำหรับ **redemption**: จะอัพเดท status ของสัญญาเป็น `"redeem"`
+
+---
+
+## 8. **POST /api/notifications/reduce-principal**
+### **รับคำขอลดเงินต้นจากลูกค้า**
+
+**Request:**
+```bash
+POST https://pawn360-ver.vercel.app/api/notifications/reduce-principal
+Content-Type: application/json
+
+{
+  "storeId": "651234567890abcdef12345",
+  "customerId": "651234567890abcdef12346",
+  "contractId": "651234567890abcdef12347",
+  "reduceAmount": 3000,
+  "customerName": "สมชาย ใจดี",
+  "phone": "0812345678",
+  "callbackUrl": "https://pawn360.vercel.app/api/webhooks/shop-notification"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "notificationId": "651234567890abcdef12348",
+  "message": "Reduce principal notification created successfully",
+  "currentPrincipal": 10000,
+  "reduceAmount": 3000,
+  "newPrincipal": 7000
+}
+```
+
+**Note:**
+- ลูกค้าจะต้องชำระ = เงินต้นที่ลด + ดอกเบี้ยค้างจ่าย
+- ดอกเบี้ยค้างคำนวณจากวันที่ตัดดอกครั้งล่าสุดถึงวันที่ลด
+
+---
+
+## 9. **POST /api/notifications/increase-principal**
+### **รับคำขอเพิ่มเงินต้นจากลูกค้า**
+
+**Request:**
+```bash
+POST https://pawn360-ver.vercel.app/api/notifications/increase-principal
+Content-Type: application/json
+
+{
+  "storeId": "651234567890abcdef12345",
+  "customerId": "651234567890abcdef12346",
+  "contractId": "651234567890abcdef12347",
+  "increaseAmount": 2000,
+  "customerName": "สมชาย ใจดี",
+  "phone": "0812345678",
+  "callbackUrl": "https://pawn360.vercel.app/api/webhooks/shop-notification"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "notificationId": "651234567890abcdef12348",
+  "message": "Increase principal notification created successfully",
+  "currentPrincipal": 10000,
+  "increaseAmount": 2000,
+  "newPrincipal": 12000
+}
+```
+
+**Note:**
+- ลูกค้ารับเงินสดที่ร้าน (ไม่ต้องโอนเงิน ไม่ต้อง QR code)
+- ดอกเบี้ยค้างจะถูกตัดรอบและสะสมไว้ในระบบ
+
+---
+
+## 10. **PUT /api/notifications/{id}/verify-principal-change**
+### **พนักงานยืนยันการลด/เพิ่มเงินต้น**
+
+**Request:**
+```bash
+PUT https://pawn360-ver.vercel.app/api/notifications/651234567890abcdef12348/verify-principal-change
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "verified": true,
+  "responseMessage": "ดำเนินการเรียบร้อยแล้ว"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "notification": {
+    "_id": "651234567890abcdef12348",
+    "type": "reduce_principal",
+    "status": "completed",
+    "verified": true,
+    "message": "ดำเนินการเรียบร้อยแล้ว"
+  }
+}
+```
+
+**Note:**
+- สำหรับ **reduce_principal**: อัพเดท `principalAmount`, reset `lastInterestCutoffDate`, reset `accruedInterest = 0`
+- สำหรับ **increase_principal**: อัพเดท `principalAmount`, reset `lastInterestCutoffDate`, เพิ่ม `accruedInterest`
 
 ---
 

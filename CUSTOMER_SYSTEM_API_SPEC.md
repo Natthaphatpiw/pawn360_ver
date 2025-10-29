@@ -155,17 +155,20 @@
 ```json
 {
   "_id": "651234567890abcdef12347",
-  "customerId": "651234567890abcdef12346",
+  "lineId": "U1234567890abcdef",
   "storeId": "651234567890abcdef12345",
-  "contractNumber": "CT-2025-001",
-  "principalAmount": 50000,
+  "brand": "Apple",
+  "model": "iPhone 12 pro",
+  "type": "โทรศัพท์",
+  "desiredAmount": 50000,
+  "loanDays": 7,
   "interestRate": 3,
   "status": "active",
-  "customerName": "สมชาย ใจดี",
-  "phone": "0812345678",
-  "lineUserId": "U1234567890abcdef"
+  "createdAt": "2025-01-01T00:00:00.000Z"
 }
 ```
+
+⚠️ **หมายเหตุ**: ไม่มี `contractNumber`, `customerName`, `phone` ใน collection `items` - ต้องดึงจาก LINE Profile API หรือ collection อื่น
 
 ---
 
@@ -182,23 +185,29 @@
 ```
 
 #### หน้าที่:
-1. ดึงข้อมูลสัญญาจาก database
+1. ดึงข้อมูล item จาก database (collection: `items` ⚠️)
 2. สร้าง `callbackUrl` = `https://pawn360.vercel.app/api/webhooks/shop-notification`
 3. POST ไปยัง Shop System:
 
 ```javascript
+// ⚠️ ใช้ collection 'items' ไม่ใช่ 'contracts'
+const item = await db.collection('items').findOne({
+  _id: new ObjectId(contractId),
+  lineId: lineUserId  // ⚠️ ใช้ lineId
+});
+
 const response = await fetch('https://pawn360-ver.vercel.app/api/notifications/redemption', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    storeId: contract.storeId,
-    customerId: contract.customerId,
-    contractId: contract._id,
-    customerName: contract.customerName,
-    phone: contract.phone,
-    message: "ต้องการไถ่ถอนทองคำที่จำนำไว้",
+    storeId: item.storeId.toString(),
+    customerId: lineUserId, // TODO: ใช้ customerId จริง
+    contractId: item._id.toString(),
+    customerName: 'ลูกค้า', // TODO: ดึงจาก LINE Profile API
+    phone: '', // TODO: ดึงจาก collection อื่น
+    message: "ต้องการไถ่ถอนสินค้าที่จำนำไว้",
     callbackUrl: "https://pawn360.vercel.app/api/webhooks/shop-notification"
   })
 });
@@ -443,23 +452,57 @@ function generateWebhookSignature(payload: any): string {
 }
 ```
 
-### Collection: `contracts`
+### Collection: `items` ⚠️ (ไม่ใช่ `contracts`)
 ```javascript
 {
   _id: ObjectId,
-  contractNumber: String,
-  customerId: ObjectId,
+  lineId: String,              // ⚠️ LINE User ID (ใช้ lineId ไม่ใช่ lineUserId)
+
+  // ข้อมูลสินค้าที่จำนำ
+  brand: String,
+  model: String,
+  type: String,
+  serialNo: String,
+  condition: Number,
+  defects: String,
+  note: String,
+  accessories: String,
+  images: Array<String>,
+
+  // ข้อมูลสัญญา
+  status: 'active' | 'redeem' | 'completed' | 'expired',
+  currentContractId: ObjectId,
+  contractHistory: Array<ObjectId>,
+
+  // ข้อมูลการเงิน - ⚠️ ชื่อจริง!
+  desiredAmount: Number,       // ⚠️ เงินต้น (ไม่ใช่ principalAmount)
+  estimatedValue: Number,
+  loanDays: Number,            // ⚠️ จำนวนวัน (ไม่ใช่ contractDays)
+  interestRate: Number,        // อัตราดอกเบี้ย % ต่อเดือน
+
+  // สำหรับคำนวณดอกเบี้ย
+  lastInterestCutoffDate: Date,
+  accruedInterest: Number,
+
+  // ประวัติ
+  principalHistory: Array<Object>,
+  extensionHistory: Array<Object>,
+  redeemedAt: Date,
+
+  // อื่นๆ
   storeId: ObjectId,
-  principalAmount: Number,
-  interestRate: Number,
-  status: 'active' | 'completed' | 'expired',
-  customerName: String,
-  phone: String,
-  lineUserId: String,
-  createdAt: Date,
+  negotiationStatus: String,
+  createdAt: Date,             // ⚠️ วันเริ่มสัญญา (ไม่ใช่ startDate)
   updatedAt: Date
 }
 ```
+
+⚠️ **IMPORTANT**:
+- Collection name คือ `items` **ไม่ใช่** `contracts`
+- ใช้ `desiredAmount` **ไม่ใช่** `principalAmount`
+- ใช้ `loanDays` **ไม่ใช่** `contractDays`
+- ใช้ `lineId` **ไม่ใช่** `lineUserId`
+- ไม่มี `dueDate` - ต้องคำนวณจาก `createdAt + loanDays`
 
 ---
 
@@ -519,9 +562,47 @@ AWS_REGION=ap-southeast-2
 - [ ] `GET /api/customer/contracts/{contractId}` - ดึงข้อมูลสัญญา
 - [ ] LINE Bot Webhook Handler - รับ events จาก LINE
 - [ ] LINE Flex Message Templates - 3 templates
-- [ ] Database Schema - `notifications` และ `contracts`
+- [ ] Database Schema - `notifications` และ `items` ⚠️
 - [ ] Webhook Signature Verification - ตรวจสอบ security
 - [ ] Environment Variables - กำหนดค่าใน `.env`
+
+---
+
+## ⚠️ CRITICAL: Database Schema Warnings
+
+### ❌ WRONG (ห้ามใช้):
+```javascript
+// ❌ Collection ผิด
+const contract = await db.collection('contracts').findOne(...);
+
+// ❌ Field names ผิด
+const principal = contract.principalAmount;
+const days = contract.contractDays;
+const userId = contract.lineUserId;
+```
+
+### ✅ CORRECT (ใช้แบบนี้):
+```javascript
+// ✅ Collection ถูกต้อง
+const item = await db.collection('items').findOne(...);
+
+// ✅ Field names ถูกต้อง
+const principal = item.desiredAmount;
+const days = item.loanDays;
+const userId = item.lineId;
+```
+
+### 📋 Schema Validation Checklist
+
+ก่อนเขียนโค้ดทุกครั้ง ต้องตรวจสอบ:
+
+- [ ] ใช้ `db.collection('items')` **ไม่ใช่** `'contracts'`
+- [ ] ใช้ `item.desiredAmount` **ไม่ใช่** `contract.principalAmount`
+- [ ] ใช้ `item.loanDays` **ไม่ใช่** `contract.contractDays`
+- [ ] ใช้ `item.lineId` **ไม่ใช่** `contract.lineUserId`
+- [ ] ใช้ `item.createdAt` **ไม่ใช่** `contract.startDate`
+- [ ] **ไม่มี** `dueDate` field - ต้องคำนวณเอง
+- [ ] ตรวจสอบ optional fields ก่อนใช้
 
 ---
 
@@ -530,7 +611,10 @@ AWS_REGION=ap-southeast-2
 - [LINE Messaging API Docs](https://developers.line.biz/en/docs/messaging-api/)
 - [LINE Flex Message Simulator](https://developers.line.biz/flex-simulator/)
 - [Shop System API Docs](https://pawn360-ver.vercel.app/api.txt)
+- [CORRECTED_SCHEMA_DOCUMENTATION.md](./CORRECTED_SCHEMA_DOCUMENTATION.md) - **อ่านก่อนเขียนโค้ด!**
 
 ---
 
 **ระบบนี้ออกแบบมาเป็น Asynchronous เพื่อหลีกเลี่ยงปัญหา timeout และให้ทั้ง 2 ระบบทำงานอิสระกันได้!** 🚀
+
+⚠️ **อย่าลืม**: ใช้ `items` collection และ field names ที่ถูกต้องทุกครั้ง!

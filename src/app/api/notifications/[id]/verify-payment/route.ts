@@ -3,6 +3,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { getUserIdFromToken } from '@/lib/auth';
 import { ObjectId } from 'mongodb';
 import { sendPaymentVerifiedWebhook } from '@/lib/webhook';
+import { calculateNewDueDate } from '@/lib/interest-calculator';
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -69,6 +70,53 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
       }
     );
+
+    // Update item/contract based on notification type (if verified)
+    if (verified) {
+      const item = await db.collection('items').findOne({
+        _id: notification.contractId
+      });
+
+      if (item) {
+        if (notification.type === 'extension') {
+          // ต่อดอกเบี้ย - บันทึก extension history
+          const loanDays = item.loanDays || 7;
+
+          await db.collection('items').updateOne(
+            { _id: notification.contractId },
+            {
+              $set: {
+                updatedAt: new Date()
+              },
+              $push: {
+                extensionHistory: {
+                  extendedAt: new Date(),
+                  extensionDays: loanDays,
+                  notificationId: new ObjectId(id)
+                }
+              }
+            }
+          );
+
+          console.log(`[VerifyPayment] Item/Contract extended: ${item._id}, extension days: ${loanDays}`);
+
+        } else if (notification.type === 'redemption') {
+          // ไถ่ถอน - เปลี่ยนสถานะเป็น redeem
+          await db.collection('items').updateOne(
+            { _id: notification.contractId },
+            {
+              $set: {
+                status: 'redeem',
+                redeemedAt: new Date(),
+                updatedAt: new Date()
+              }
+            }
+          );
+
+          console.log(`[VerifyPayment] Item/Contract redeemed: ${item._id}`);
+        }
+      }
+    }
 
     // Send webhook to external system (LINE) asynchronously
     if (notification.callbackUrl) {
