@@ -93,8 +93,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                   extendedAt: new Date(),
                   extensionDays: loanDays,
                   notificationId: new ObjectId(id)
-                }
-              }
+                } as any
+              } as any
             }
           );
 
