@@ -18,8 +18,25 @@ export async function POST(
     const contractObjectId = new ObjectId(contractId);
     const now = new Date();
 
-    // Get current contract
-    const contract = await db.collection('contracts').findOne({ _id: contractObjectId });
+    // Get current contract - first try direct lookup by contractId
+    let contract = await db.collection('contracts').findOne({ _id: contractObjectId });
+
+    // If not found, try to find by itemId or look up from items collection
+    if (!contract) {
+      const item = await db.collection('items').findOne({
+        $or: [
+          { _id: contractObjectId },
+          { currentContractId: contractObjectId.toString() }
+        ]
+      });
+
+      if (item && item.currentContractId) {
+        contract = await db.collection('contracts').findOne({
+          _id: new ObjectId(item.currentContractId)
+        });
+      }
+    }
+
     if (!contract) {
       return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
     }
@@ -27,7 +44,7 @@ export async function POST(
     let updateData: any = { updatedAt: now };
     let transactionData: any = {
       _id: new ObjectId(),
-      contractId: contractObjectId,
+      contractId: contract._id,
       customerId: contract.customerId,
       processedBy: new ObjectId(actionData.processedBy),
       storeId: contract.storeId,
@@ -109,22 +126,58 @@ export async function POST(
         transactionData.afterBalance = actionData.amount;
         break;
 
+      case 'extension':
+        // Extend contract due date
+        const extensionDays = actionData.extensionDays || 30;
+        const currentDueDate = contract.dates.dueDate ? new Date(contract.dates.dueDate) : new Date();
+        const newDueDate = new Date(currentDueDate.getTime() + extensionDays * 24 * 60 * 60 * 1000);
+        updateData['dates.dueDate'] = newDueDate;
+        updateData['pawnDetails.periodDays'] = (contract.pawnDetails.periodDays || 30) + extensionDays;
+        transactionData.extensionDays = extensionDays;
+        transactionData.beforeBalance = contract.pawnDetails.remainingAmount;
+        transactionData.afterBalance = contract.pawnDetails.remainingAmount; // Amount stays the same
+        break;
+
       default:
         return NextResponse.json({ error: 'Invalid action type' }, { status: 400 });
     }
 
     // Update contract
     await db.collection('contracts').updateOne(
-      { _id: contractObjectId },
+      { _id: contract._id },
       {
         $set: updateData,
-        // @ts-ignore - MongoDB ObjectId type compatibility
         $push: { transactionHistory: transactionData._id.toString() }
       }
     );
 
     // Add transaction record
     await db.collection('transactions').insertOne(transactionData);
+
+    // Also update items collection if this action affects item status
+    if (['redeem', 'suspend', 'sold', 'extension'].includes(actionData.type)) {
+      let itemStatus = 'active';
+      if (actionData.type === 'redeem') itemStatus = 'redeemed';
+      if (actionData.type === 'suspend') itemStatus = 'suspended';
+      if (actionData.type === 'sold') itemStatus = 'sold';
+
+      // Find the corresponding item
+      const item = await db.collection('items').findOne({
+        currentContractId: contract._id.toString()
+      });
+
+      if (item) {
+        await db.collection('items').updateOne(
+          { _id: item._id },
+          {
+            $set: {
+              status: itemStatus,
+              updatedAt: now
+            }
+          }
+        );
+      }
+    }
 
     return NextResponse.json({ success: true, transactionId: transactionData._id });
   } catch (error) {

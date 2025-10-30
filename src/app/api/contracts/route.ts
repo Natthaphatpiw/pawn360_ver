@@ -26,8 +26,47 @@ export async function GET(request: NextRequest) {
       query.status = status;
     }
 
-    // Fetch items instead of contracts
-    const items = await db.collection('items').find(query).sort({ createdAt: -1 }).toArray();
+    // First, try to fetch from contracts collection (active contracts)
+    const contracts = await db.collection('contracts')
+      .aggregate([
+        { $match: { ...query, status: { $in: ['active', 'overdue', 'suspended'] } } },
+        {
+          $lookup: {
+            from: 'customers',
+            localField: 'customerId',
+            foreignField: '_id',
+            as: 'customer'
+          }
+        },
+        {
+          $addFields: {
+            customer: { $arrayElemAt: ['$customer', 0] }
+          }
+        },
+        {
+          $lookup: {
+            from: 'transactions',
+            let: { contractId: '$_id' },
+            pipeline: [
+              { $match: { $expr: { $eq: ['$contractId', '$$contractId'] } } },
+              { $sort: { createdAt: -1 } }
+            ],
+            as: 'transactionHistory'
+          }
+        }
+      ])
+      .sort({ 'dates.startDate': -1 })
+      .toArray();
+
+    // If we have contracts, return them
+    if (contracts.length > 0) {
+      // Convert ObjectIds and return
+      const convertedContracts = contracts.map(contract => convertObjectIds(contract));
+      return NextResponse.json(convertedContracts);
+    }
+
+    // Fallback: Fetch from items collection (pending contracts)
+    const items = await db.collection('items').find({ ...query, status: 'active' }).sort({ createdAt: -1 }).toArray();
 
     // Helper function to convert ObjectIds and datetimes
     function convertObjectIds(obj: any): any {
@@ -311,17 +350,37 @@ export async function PUT(request: NextRequest) {
         },
         storeId: item.storeId,
         createdBy: new ObjectId(userId),
-        transactionHistory: [{
-          type: 'contract_created',
-          amount: pawnPrice,
-          date: currentTime,
-          description: 'Contract created and approved'
-        }]
+        transactionHistory: []
       };
 
       // Insert contract
       const contractResult = await db.collection('contracts').insertOne(contractDoc);
       const actualContractId = contractResult.insertedId;
+
+      // Add initial transaction for contract creation
+      const initialTransaction = {
+        _id: new ObjectId(),
+        contractId: actualContractId,
+        type: 'contract_created',
+        amount: pawnPrice,
+        customerId: null, // Will be set if we have customer info
+        processedBy: new ObjectId(userId),
+        storeId: item.storeId,
+        createdAt: currentTime,
+        description: 'Contract created and approved',
+        beforeBalance: 0,
+        afterBalance: pawnPrice
+      };
+
+      await db.collection('transactions').insertOne(initialTransaction);
+
+      // Update contract with transaction history
+      await db.collection('contracts').updateOne(
+        { _id: actualContractId },
+        {
+          $push: { transactionHistory: initialTransaction._id.toString() }
+        }
+      );
 
       // Update item with contract info
       await db.collection('items').updateOne(

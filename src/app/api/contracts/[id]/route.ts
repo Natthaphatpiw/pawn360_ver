@@ -92,14 +92,27 @@ export async function GET(
 
         // If there's a currentContractId, try to get the actual contract data
         if (convertedItem.currentContractId) {
-          const actualContract = await db.collection('contracts').findOne({
-            _id: new ObjectId(convertedItem.currentContractId)
-          });
+          const actualContract = await db.collection('contracts')
+            .aggregate([
+              { $match: { _id: new ObjectId(convertedItem.currentContractId) } },
+              {
+                $lookup: {
+                  from: 'transactions',
+                  let: { contractId: '$_id' },
+                  pipeline: [
+                    { $match: { $expr: { $eq: ['$contractId', '$$contractId'] } } },
+                    { $sort: { createdAt: -1 } }
+                  ],
+                  as: 'transactionHistory'
+                }
+              }
+            ])
+            .toArray();
 
-          if (actualContract) {
+          if (actualContract && actualContract.length > 0) {
+            const contract = convertObjectIds(actualContract[0]);
             // Merge actual contract data
-            contractData = { ...contractData, ...convertObjectIds(actualContract) };
-            contractData.transactionHistory = actualContract.transactionHistory || [];
+            contractData = { ...contractData, ...contract };
           }
         }
       } else {
@@ -124,7 +137,7 @@ export async function GET(
       return NextResponse.json(contractData);
     }
 
-    // If not found in items, try legacy contracts collection (backward compatibility)
+    // If not found in items, try contracts collection directly (for legacy or direct contract access)
     const contract = await db.collection('contracts')
       .aggregate([
         { $match: { _id: new ObjectId(itemId) } },
@@ -140,6 +153,17 @@ export async function GET(
           $addFields: {
             customer: { $arrayElemAt: ['$customer', 0] }
           }
+        },
+        {
+          $lookup: {
+            from: 'transactions',
+            let: { contractId: '$_id' },
+            pipeline: [
+              { $match: { $expr: { $eq: ['$contractId', '$$contractId'] } } },
+              { $sort: { createdAt: -1 } }
+            ],
+            as: 'transactionHistory'
+          }
         }
       ])
       .toArray();
@@ -148,24 +172,7 @@ export async function GET(
       return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
     }
 
-    const contractData = contract[0];
-
-    // Get transaction history
-    let transactions = [];
-    if (contractData.transactionHistory && contractData.transactionHistory.length > 0) {
-      transactions = await db.collection('transactions')
-        .find({ _id: { $in: contractData.transactionHistory.map((id: any) => new ObjectId(id)) } })
-        .sort({ createdAt: -1 })
-        .toArray();
-    } else {
-      // Fallback: get by contractId if transactionHistory is empty
-      transactions = await db.collection('transactions')
-        .find({ contractId: new ObjectId(itemId) })
-        .sort({ createdAt: -1 })
-        .toArray();
-    }
-
-    contractData.transactionHistory = transactions;
+    const contractData = convertObjectIds(contract[0]);
 
     return NextResponse.json(contractData);
   } catch (error) {
