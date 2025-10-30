@@ -15,16 +15,6 @@
 
 ---
 
-## 🏗️ Tech Stack
-
-- **Framework**: Next.js 14+ (App Router)
-- **Database**: MongoDB
-- **LINE**: LINE Messaging API
-- **Language**: TypeScript
-- **Deploy**: Vercel
-
----
-
 ## 🗄️ Database Schema
 
 ⚠️ **IMPORTANT: ใช้ collection `items` ไม่ใช่ `contracts`!**
@@ -48,7 +38,7 @@ interface Item {
   images: Array<string>;
 
   // ข้อมูลสัญญาจำนำ
-  status: 'active' | 'redeem' | 'completed' | 'expired';
+  status
   currentContractId: ObjectId;
   contractHistory: Array<ObjectId>;
 
@@ -114,7 +104,7 @@ interface Item {
 ```
 
 ⚠️ **หมายเหตุสำคัญ**:
-- ไม่มี field `dueDate` - ต้องคำนวณจาก `createdAt + loanDays`
+- ไม่มี field `dueDate` - ต้องคำนวณจาก `createdAt + loanDays` ให้เพิ่มฟิดล์ dueDate ไปด้วยในทุกระบบ ในขั้นตอนการสร้างรายการสัญญาให้สร้างฟิดล์ dueDate ด้วย
 - ไม่มี `contractNumber` - ใช้ `_id` หรือสร้างจาก business logic
 - ไม่มี `customerName`, `phone` แยกไปอยู่ใน collection อื่น - ดึงมาผ่าน `lineId`
 
