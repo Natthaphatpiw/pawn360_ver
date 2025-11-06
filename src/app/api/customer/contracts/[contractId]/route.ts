@@ -4,11 +4,11 @@ import { ObjectId } from 'mongodb';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { contractId: string } }
+  { params }: { params: Promise<{ contractId: string }> }
 ) {
   try {
     const db = await getDatabase();
-    const contractId = params.contractId;
+    const { contractId } = await params;
 
     if (!contractId) {
       return NextResponse.json(
