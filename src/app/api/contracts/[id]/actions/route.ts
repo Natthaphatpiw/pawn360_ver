@@ -147,7 +147,7 @@ export async function POST(
       { _id: contract._id },
       {
         $set: updateData,
-        $push: { transactionHistory: transactionData._id.toString() }
+        $push: { transactionHistory: transactionData._id.toString() } as any
       }
     );
 
