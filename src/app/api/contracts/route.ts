@@ -378,7 +378,7 @@ export async function PUT(request: NextRequest) {
       await db.collection('contracts').updateOne(
         { _id: actualContractId },
         {
-          $push: { transactionHistory: initialTransaction._id.toString() }
+          $push: { transactionHistory: initialTransaction._id.toString() } as any
         }
       );
 
