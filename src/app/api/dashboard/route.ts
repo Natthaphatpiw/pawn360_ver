@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       status: 'overdue'
     });
 
-    // ⚠️ คำนวณมูลค่ารวมจาก pawnDetails.pawnedPrice เท่านั้น
+    // ⚠️ คำนวณมูลค่ารวมจาก pawnDetails.remainingAmount เท่านั้น
     const contracts = await db.collection('contracts').find({
       ...contractFilter,
       status: { $in: ['active', 'pending', 'overdue'] }
@@ -52,10 +52,13 @@ export async function GET(request: NextRequest) {
 
     let totalPawnedValue = 0;
     for (const contract of contracts) {
-      // ✅ ใช้ pawnDetails.pawnedPrice เท่านั้น
-      const pawnedPrice = contract.pawnDetails?.pawnedPrice || 0;
-      totalPawnedValue += pawnedPrice;
+      // ✅ ใช้ pawnDetails.remainingAmount เท่านั้น (เงินต้น + ดอกเบี้ย)
+      const remainingAmount = contract.pawnDetails?.remainingAmount || 0;
+      totalPawnedValue += remainingAmount;
     }
+
+    // Round to 2 decimal places
+    totalPawnedValue = Math.round(totalPawnedValue * 100) / 100;
 
     return NextResponse.json({
       total_customers: totalCustomers,
