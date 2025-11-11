@@ -17,6 +17,7 @@ export default function SignUpPage() {
 
     // Store Information
     storeName: '',
+    username: '',
     address: {
       houseNumber: '',
       village: '',
@@ -163,6 +164,7 @@ export default function SignUpPage() {
           },
           store: {
             store_name: formData.storeName,
+            username: formData.username,
             address: formData.address,
             phone: formData.phone,
             tax_id: formData.taxId,
@@ -367,7 +369,24 @@ export default function SignUpPage() {
                     placeholder="Enter store name"
                   />
                 </div>
-                
+
+                <div>
+                  <label className="block text-sm font-medium text-clay-grey mb-1">
+                    Username*
+                  </label>
+                  <input
+                    type="text"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                    placeholder="Enter username for store"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-clay-grey mb-1">
                     Phone Number*
@@ -382,20 +401,20 @@ export default function SignUpPage() {
                     placeholder="Enter phone number"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-clay-grey mb-1">
-                  Tax ID
-                </label>
-                <input
-                  type="text"
-                  name="taxId"
-                  value={formData.taxId}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
-                  placeholder="Enter tax identification number"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-clay-grey mb-1">
+                    Tax ID
+                  </label>
+                  <input
+                    type="text"
+                    name="taxId"
+                    value={formData.taxId}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-l-grey-4 rounded-lg form-input"
+                    placeholder="Enter tax identification number"
+                  />
+                </div>
               </div>
 
               {/* Google Maps URL */}

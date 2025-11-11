@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     if (store) {
       storeDoc = {
         storeName: store.store_name,
+        username: store.username || '', // เพิ่มฟิลด์ username
         phone: store.phone,
         taxId: store.tax_id,
         address: store.address,
